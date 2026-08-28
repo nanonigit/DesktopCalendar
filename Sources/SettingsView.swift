@@ -99,6 +99,30 @@ struct SettingsView: View {
                         Text("📊 パネルレイアウトと表示")
                             .font(.headline)
                         
+                        // Frontmost / Desktop Layer Toggle
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("表示レイヤー（操作モード）")
+                                .font(.subheadline.bold())
+                                .foregroundColor(.secondary)
+                            
+                            Picker("表示レイヤー", selection: Binding(
+                                get: { settings.isFrontmostMode ? 1 : 0 },
+                                set: { val in
+                                    NotificationCenter.default.post(name: Notification.Name("SetWindowFrontmost"), object: val == 1)
+                                }
+                            )) {
+                                Text("デスクトップ背面（通常）").tag(0)
+                                Text("最前面（移動・操作可能）").tag(1)
+                            }
+                            .pickerStyle(.segmented)
+                            
+                            Text(settings.isFrontmostMode ? "※ 最前面モード中: ウィンドウを掴んでドラッグ移動したり、直接操作できます。" : "※ 通常モード: 壁紙の背面に配置され、作業の邪魔になりません。")
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary.opacity(0.85))
+                                .padding(.top, 1)
+                        }
+                        .padding(.vertical, 2)
+                        
                         Toggle("月間カレンダーを表示", isOn: $settings.showMonthCalendar)
                         Toggle("右側のタイムラインを表示", isOn: $settings.showAgenda)
                         Toggle("リマインダー / ToDo を表示", isOn: $settings.showReminders)
@@ -354,7 +378,7 @@ struct SettingsView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .padding(20)
-        .frame(width: 520, height: 680)
+        .frame(width: 520, height: 700)
         .background(VisualEffectView(material: .hudWindow, blendingMode: .behindWindow))
         .onAppear {
             calendarManager.fetchCalendarsList()

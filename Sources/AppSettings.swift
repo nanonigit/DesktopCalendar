@@ -55,6 +55,8 @@ class AppSettings: ObservableObject {
         }
     }
     
+    @Published var isFrontmostMode: Bool = false
+    
     var reminderDateRange: ReminderDateRange {
         get { ReminderDateRange(rawValue: reminderDateRangeRaw) ?? .all }
         set {
