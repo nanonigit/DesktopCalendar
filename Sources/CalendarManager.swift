@@ -53,8 +53,18 @@ class CalendarManager: ObservableObject {
     
     func fetchCalendarsList() {
         guard isAuthorized else { return }
-        self.availableCalendars = store.calendars(for: .event).sorted { $0.title < $1.title }
-        self.availableReminderLists = store.calendars(for: .reminder).sorted { $0.title < $1.title }
+        self.availableCalendars = store.calendars(for: .event).sorted { c1, c2 in
+            if c1.source.title == c2.source.title {
+                return c1.title < c2.title
+            }
+            return c1.source.title < c2.source.title
+        }
+        self.availableReminderLists = store.calendars(for: .reminder).sorted { c1, c2 in
+            if c1.source.title == c2.source.title {
+                return c1.title < c2.title
+            }
+            return c1.source.title < c2.source.title
+        }
     }
     
     @objc private func eventStoreChanged() {
@@ -70,6 +80,14 @@ class CalendarManager: ObservableObject {
         let settings = AppSettings.shared
         let calendar = Calendar.current
         guard let monthInterval = calendar.dateInterval(of: .month, for: month) else { return }
+        
+        // Ensure calendar list is populated
+        if availableCalendars.isEmpty {
+            self.availableCalendars = store.calendars(for: .event)
+        }
+        if availableReminderLists.isEmpty {
+            self.availableReminderLists = store.calendars(for: .reminder)
+        }
         
         // Filter event calendars
         let enabledCalendars = availableCalendars.filter { settings.isCalendarEnabled($0.calendarIdentifier) }

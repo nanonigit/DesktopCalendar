@@ -7,6 +7,22 @@ struct SettingsView: View {
     @ObservedObject var weatherManager: WeatherManager = WeatherManager.shared
     @Environment(\.presentationMode) var presentationMode
     
+    // Group calendars by source account
+    private var groupedCalendars: [(source: String, calendars: [EKCalendar])] {
+        let dict = Dictionary(grouping: calendarManager.availableCalendars, by: { $0.source.title })
+        return dict.keys.sorted().map { key in
+            (source: key, calendars: dict[key] ?? [])
+        }
+    }
+    
+    // Group reminder lists by source account
+    private var groupedReminderLists: [(source: String, lists: [EKCalendar])] {
+        let dict = Dictionary(grouping: calendarManager.availableReminderLists, by: { $0.source.title })
+        return dict.keys.sorted().map { key in
+            (source: key, lists: dict[key] ?? [])
+        }
+    }
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             // Header
@@ -148,90 +164,150 @@ struct SettingsView: View {
                     
                     Divider()
                     
-                    // Section 5: Calendar & Reminder Lists Filtering
+                    // Section 5: Calendar & Reminder Lists Filtering (Grouped by Account Source)
                     VStack(alignment: .leading, spacing: 12) {
                         Text("🗓 表示するカレンダー・リストの選択")
                             .font(.headline)
                         
                         // Calendars
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("カレンダーアカウント")
-                                .font(.subheadline.bold())
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Text("カレンダーアカウント")
+                                    .font(.subheadline.bold())
+                                    .foregroundColor(.secondary)
+                                
+                                Spacer()
+                                
+                                Button("すべて選択") {
+                                    settings.disabledCalendarIDs = []
+                                    calendarManager.fetchData(for: settings.currentMonthDate)
+                                }
+                                .font(.caption)
+                                .buttonStyle(.plain)
+                                .foregroundColor(.accentColor)
+                                
+                                Text("|").font(.caption).foregroundColor(.secondary.opacity(0.5))
+                                
+                                Button("すべて解除") {
+                                    settings.disabledCalendarIDs = Set(calendarManager.availableCalendars.map { $0.calendarIdentifier })
+                                    calendarManager.fetchData(for: settings.currentMonthDate)
+                                }
+                                .font(.caption)
+                                .buttonStyle(.plain)
                                 .foregroundColor(.secondary)
+                            }
                             
                             if calendarManager.availableCalendars.isEmpty {
-                                Text("利用可能なカレンダーがありません")
+                                Text("利用可能なカレンダーがありません（システム設定でカレンダーのアクセスを許可してください）")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             } else {
-                                VStack(spacing: 4) {
-                                    ForEach(calendarManager.availableCalendars, id: \.calendarIdentifier) { cal in
-                                        let isEnabled = settings.isCalendarEnabled(cal.calendarIdentifier)
-                                        HStack(spacing: 8) {
-                                            Circle()
-                                                .fill(Color(nsColor: NSColor(cgColor: cal.cgColor) ?? .systemBlue))
-                                                .frame(width: 9, height: 9)
-                                            
-                                            Text(cal.title)
-                                                .font(.system(size: 12.5))
-                                            
-                                            Spacer()
-                                            
-                                            Toggle("", isOn: Binding(
-                                                get: { isEnabled },
-                                                set: { _ in
-                                                    settings.toggleCalendar(cal.calendarIdentifier)
-                                                    calendarManager.fetchData(for: settings.currentMonthDate)
-                                                }
-                                            ))
-                                            .toggleStyle(.checkbox)
+                                ForEach(groupedCalendars, id: \.source) { group in
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(group.source)
+                                            .font(.caption.bold())
+                                            .foregroundColor(.secondary.opacity(0.8))
+                                            .padding(.top, 2)
+                                        
+                                        ForEach(group.calendars, id: \.calendarIdentifier) { cal in
+                                            let isEnabled = settings.isCalendarEnabled(cal.calendarIdentifier)
+                                            HStack(spacing: 8) {
+                                                Circle()
+                                                    .fill(Color(nsColor: NSColor(cgColor: cal.cgColor) ?? .systemBlue))
+                                                    .frame(width: 9, height: 9)
+                                                
+                                                Text(cal.title)
+                                                    .font(.system(size: 12.5))
+                                                
+                                                Spacer()
+                                                
+                                                Toggle("", isOn: Binding(
+                                                    get: { isEnabled },
+                                                    set: { _ in
+                                                        settings.toggleCalendar(cal.calendarIdentifier)
+                                                        calendarManager.fetchData(for: settings.currentMonthDate)
+                                                    }
+                                                ))
+                                                .toggleStyle(.checkbox)
+                                            }
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 4)
+                                            .background(Color.white.opacity(0.04))
+                                            .cornerRadius(5)
                                         }
-                                        .padding(.horizontal, 8)
-                                        .padding(.vertical, 4)
-                                        .background(Color.white.opacity(0.04))
-                                        .cornerRadius(5)
                                     }
                                 }
                             }
                         }
                         
+                        Divider().padding(.vertical, 2)
+                        
                         // Reminders Lists
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("リマインダーリスト")
-                                .font(.subheadline.bold())
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Text("リマインダーリスト")
+                                    .font(.subheadline.bold())
+                                    .foregroundColor(.secondary)
+                                
+                                Spacer()
+                                
+                                Button("すべて選択") {
+                                    settings.disabledReminderListIDs = []
+                                    calendarManager.fetchData(for: settings.currentMonthDate)
+                                }
+                                .font(.caption)
+                                .buttonStyle(.plain)
+                                .foregroundColor(.accentColor)
+                                
+                                Text("|").font(.caption).foregroundColor(.secondary.opacity(0.5))
+                                
+                                Button("すべて解除") {
+                                    settings.disabledReminderListIDs = Set(calendarManager.availableReminderLists.map { $0.calendarIdentifier })
+                                    calendarManager.fetchData(for: settings.currentMonthDate)
+                                }
+                                .font(.caption)
+                                .buttonStyle(.plain)
                                 .foregroundColor(.secondary)
+                            }
                             
                             if calendarManager.availableReminderLists.isEmpty {
-                                Text("利用可能なリマインダーリストがありません")
+                                Text("利用可能なリマインダーリストがありません（システム設定でリマインダーのアクセスを許可してください）")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             } else {
-                                VStack(spacing: 4) {
-                                    ForEach(calendarManager.availableReminderLists, id: \.calendarIdentifier) { list in
-                                        let isEnabled = settings.isReminderListEnabled(list.calendarIdentifier)
-                                        HStack(spacing: 8) {
-                                            Circle()
-                                                .fill(Color(nsColor: NSColor(cgColor: list.cgColor) ?? .systemBlue))
-                                                .frame(width: 9, height: 9)
-                                            
-                                            Text(list.title)
-                                                .font(.system(size: 12.5))
-                                            
-                                            Spacer()
-                                            
-                                            Toggle("", isOn: Binding(
-                                                get: { isEnabled },
-                                                set: { _ in
-                                                    settings.toggleReminderList(list.calendarIdentifier)
-                                                    calendarManager.fetchData(for: settings.currentMonthDate)
-                                                }
-                                            ))
-                                            .toggleStyle(.checkbox)
+                                ForEach(groupedReminderLists, id: \.source) { group in
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(group.source)
+                                            .font(.caption.bold())
+                                            .foregroundColor(.secondary.opacity(0.8))
+                                            .padding(.top, 2)
+                                        
+                                        ForEach(group.lists, id: \.calendarIdentifier) { list in
+                                            let isEnabled = settings.isReminderListEnabled(list.calendarIdentifier)
+                                            HStack(spacing: 8) {
+                                                Circle()
+                                                    .fill(Color(nsColor: NSColor(cgColor: list.cgColor) ?? .systemBlue))
+                                                    .frame(width: 9, height: 9)
+                                                
+                                                Text(list.title)
+                                                    .font(.system(size: 12.5))
+                                                
+                                                Spacer()
+                                                
+                                                Toggle("", isOn: Binding(
+                                                    get: { isEnabled },
+                                                    set: { _ in
+                                                        settings.toggleReminderList(list.calendarIdentifier)
+                                                        calendarManager.fetchData(for: settings.currentMonthDate)
+                                                    }
+                                                ))
+                                                .toggleStyle(.checkbox)
+                                            }
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 4)
+                                            .background(Color.white.opacity(0.04))
+                                            .cornerRadius(5)
                                         }
-                                        .padding(.horizontal, 8)
-                                        .padding(.vertical, 4)
-                                        .background(Color.white.opacity(0.04))
-                                        .cornerRadius(5)
                                     }
                                 }
                             }
@@ -278,8 +354,12 @@ struct SettingsView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .padding(20)
-        .frame(width: 500, height: 660)
+        .frame(width: 520, height: 680)
         .background(VisualEffectView(material: .hudWindow, blendingMode: .behindWindow))
+        .onAppear {
+            calendarManager.fetchCalendarsList()
+            calendarManager.fetchData(for: settings.currentMonthDate)
+        }
     }
     
     private func resetWindowPosition() {
