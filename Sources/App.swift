@@ -40,6 +40,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         setupMenuBarItem()
     }
     
+    // Allows Raycast, Spotlight, or Dock/Finder to reopen management screen even if menu bar icon is hidden!
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        openPreferences()
+        return true
+    }
+    
     func setupMenuBarItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = item.button {
@@ -159,6 +165,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     
     @objc func refreshEvents() {
         CalendarManager.shared.fetchData()
+        WeatherManager.shared.fetchWeather()
     }
     
     @objc func openPreferences() {
@@ -168,7 +175,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             let window = NSWindow(contentViewController: hosting)
             window.title = "DesktopCalendar 設定"
             window.styleMask = [.titled, .closable, .resizable]
-            window.setContentSize(NSSize(width: 500, height: 560))
+            window.setContentSize(NSSize(width: 500, height: 640))
             window.minSize = NSSize(width: 480, height: 420)
             window.center()
             window.isReleasedWhenClosed = false

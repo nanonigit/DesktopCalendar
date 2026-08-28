@@ -23,8 +23,11 @@ swiftc -O \
     "$DIR"/Sources/*.swift \
     -o "$MACOS_DIR/$APP_NAME"
 
-echo "=== 3. Copying Info.plist ==="
+echo "=== 3. Copying Info.plist & AppIcon ==="
 cp "$DIR/Info.plist" "$CONTENTS_DIR/Info.plist"
+if [ -f "$DIR/AppIcon.icns" ]; then
+    cp "$DIR/AppIcon.icns" "$RESOURCES_DIR/AppIcon.icns"
+fi
 
 echo "=== 4. Code Signing ==="
 codesign --force --deep --sign - "$BUNDLE_DIR"

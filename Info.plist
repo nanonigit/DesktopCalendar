@@ -2,33 +2,27 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <key>CFBundleName</key>
+    <string>DesktopCalendar</string>
+    <key>CFBundleDisplayName</key>
+    <string>DesktopCalendar</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.naoki.DesktopCalendar</string>
+    <key>CFBundleVersion</key>
+    <string>1.0.0</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0.0</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
     <key>CFBundleExecutable</key>
     <string>DesktopCalendar</string>
     <key>CFBundleIconFile</key>
     <string>AppIcon</string>
-    <key>CFBundleIdentifier</key>
-    <string>com.naoki.DesktopCalendar</string>
-    <key>CFBundleInfoDictionaryVersion</key>
-    <string>6.0</string>
-    <key>CFBundleName</key>
-    <string>DesktopCalendar</string>
-    <key>CFBundlePackageType</key>
-    <string>APPL</string>
-    <key>CFBundleShortVersionString</key>
-    <string>1.0.0</string>
-    <key>CFBundleVersion</key>
-    <string>1</string>
-    <key>LSMinimumSystemVersion</key>
-    <string>14.0</string>
     <key>LSUIElement</key>
     <true/>
-    <key>NSCalendarsUsageDescription</key>
-    <string>デスクトップにカレンダーの予定を表示するためにカレンダーへのアクセスが必要です。</string>
     <key>NSCalendarsFullAccessUsageDescription</key>
-    <string>デスクトップにカレンダーの予定を表示するためにカレンダーへのアクセスが必要です。</string>
-    <key>NSRemindersUsageDescription</key>
-    <string>デスクトップにリマインダーを表示・操作するためにリマインダーへのアクセスが必要です。</string>
+    <string>カレンダーの予定をデスクトップ上に表示するためにアクセス権が必要です。</string>
     <key>NSRemindersFullAccessUsageDescription</key>
-    <string>デスクトップにリマインダーを表示・操作するためにリマインダーへのアクセスが必要です。</string>
+    <string>リマインダー・ToDoタスクをデスクトップ上に表示するためにアクセス権が必要です。</string>
 </dict>
 </plist>
