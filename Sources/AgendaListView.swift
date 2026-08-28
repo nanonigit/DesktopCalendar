@@ -46,6 +46,11 @@ struct AgendaListView: View {
         return max(0, min(earliest, 20))
     }
     
+    private func getMinutesSinceMidnight(_ d: Date) -> Int {
+        let comp = Calendar.current.dateComponents([.hour, .minute], from: d)
+        return (comp.hour ?? 0) * 60 + (comp.minute ?? 0)
+    }
+    
     var body: some View {
         VStack(spacing: 0) {
             // 0. Location & Live Current Time Header Bar
@@ -247,11 +252,6 @@ struct AgendaListView: View {
         .frame(maxHeight: .infinity, alignment: .top)
     }
     
-    private func getMinutesSinceMidnight(_ d: Date) -> Int {
-        let comp = Calendar.current.dateComponents([.hour, .minute], from: d)
-        return (comp.hour ?? 0) * 60 + (comp.minute ?? 0)
-    }
-    
     private func formatHour(_ hour: Int) -> String {
         if settings.is24HourFormat {
             return String(format: "%d:00", hour)
@@ -320,32 +320,42 @@ struct AppleCalendarDayHeader: View {
                 .font(.system(size: 10.5, weight: .bold))
                 .foregroundColor(headerColor)
             
-            HStack(spacing: 4) {
+            HStack(spacing: 3) {
                 ZStack {
                     if isToday {
                         Circle()
                             .fill(Color.red)
-                            .frame(width: 22, height: 22)
+                            .frame(width: 21, height: 21)
                         Text(dayNumberString)
-                            .font(.system(size: 12, weight: .bold))
+                            .font(.system(size: 11.5, weight: .bold))
                             .foregroundColor(.white)
                     } else {
                         Text(dayNumberString)
-                            .font(.system(size: 12.5, weight: .bold))
+                            .font(.system(size: 12, weight: .bold))
                             .foregroundColor(numberColor)
                     }
                 }
                 
-                // Day Weather Forecast Badge (Icon + Max/Min)
+                // Day Weather Forecast Badge (Icon + High/Low Temps: e.g. ⛅️ 28°/19°)
                 if let w = weather {
                     HStack(spacing: 2) {
                         Image(systemName: w.iconName)
-                            .font(.system(size: 10))
+                            .font(.system(size: 9.5))
                             .foregroundColor(w.iconColor)
                         
-                        Text("\(w.maxTemp)°")
-                            .font(.system(size: 9.5, weight: .semibold))
-                            .foregroundColor(.white.opacity(0.85))
+                        HStack(spacing: 1.5) {
+                            Text("\(w.maxTemp)°")
+                                .font(.system(size: 9.5, weight: .bold, design: .rounded))
+                                .foregroundColor(.white.opacity(0.95))
+                            
+                            Text("/")
+                                .font(.system(size: 8, weight: .regular))
+                                .foregroundColor(.white.opacity(0.35))
+                            
+                            Text("\(w.minTemp)°")
+                                .font(.system(size: 8.5, weight: .medium, design: .rounded))
+                                .foregroundColor(.white.opacity(0.6))
+                        }
                     }
                 }
             }
