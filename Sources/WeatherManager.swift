@@ -302,14 +302,14 @@ class WeatherManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                 return
             }
             
-            // 1. Parse Daily Forecast
+            // 1. Initial Parse Daily Forecast
+            var dailyDict: [String: DayWeather] = [:]
             if let daily = json["daily"] as? [String: Any],
                let times = daily["time"] as? [String],
                let codes = daily["weathercode"] as? [Int],
                let maxTemps = daily["temperature_2m_max"] as? [Double],
                let minTemps = daily["temperature_2m_min"] as? [Double] {
                 
-                var dict: [String: DayWeather] = [:]
                 for i in 0..<times.count {
                     guard i < codes.count, i < maxTemps.count, i < minTemps.count else { break }
                     let item = DayWeather(
@@ -318,15 +318,11 @@ class WeatherManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                         maxTemp: Int(round(maxTemps[i])),
                         minTemp: Int(round(minTemps[i]))
                     )
-                    dict[times[i]] = item
-                }
-                
-                DispatchQueue.main.async {
-                    self?.dailyForecasts = dict
+                    dailyDict[times[i]] = item
                 }
             }
             
-            // 2. Parse Hourly Forecast
+            // 2. Parse Hourly Forecast & Strictly Harmonize Daily Max/Min from Hourly Values
             if let hourly = json["hourly"] as? [String: Any],
                let hTimes = hourly["time"] as? [String],
                let hCodes = hourly["weathercode"] as? [Int],
@@ -354,8 +350,30 @@ class WeatherManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                     hDict[datePart]?[hourPart] = item
                 }
                 
+                // Guarantee 100% consistency: Header Max/Min must strictly equal the actual 24-hour extremes
+                for (dateStr, hourMap) in hDict {
+                    let temps = hourMap.values.map { $0.temp }
+                    if !temps.isEmpty {
+                        let actualMax = temps.max() ?? 0
+                        let actualMin = temps.min() ?? 0
+                        let existingCode = dailyDict[dateStr]?.weatherCode ?? hourMap[12]?.weatherCode ?? 0
+                        
+                        dailyDict[dateStr] = DayWeather(
+                            dateString: dateStr,
+                            weatherCode: existingCode,
+                            maxTemp: actualMax,
+                            minTemp: actualMin
+                        )
+                    }
+                }
+                
                 DispatchQueue.main.async {
                     self?.hourlyForecasts = hDict
+                    self?.dailyForecasts = dailyDict
+                }
+            } else {
+                DispatchQueue.main.async {
+                    self?.dailyForecasts = dailyDict
                 }
             }
         }.resume()
