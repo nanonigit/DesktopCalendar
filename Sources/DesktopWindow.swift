@@ -19,8 +19,6 @@ class DesktopWindow: NSWindow {
         self.backgroundColor = .clear
         self.isOpaque = false
         self.hasShadow = true
-        self.ignoresMouseEvents = false
-        self.acceptsMouseMovedEvents = true
         self.minSize = NSSize(width: 300, height: 250)
         self.maxSize = NSSize(width: 10000, height: 10000)
         self.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
@@ -90,6 +88,7 @@ class DesktopWindow: NSWindow {
     
     func bringToFrontForInteraction() {
         self.level = .floating
+        self.ignoresMouseEvents = false
         self.isMovableByWindowBackground = true
         self.isFrontmostMode = true
         AppSettings.shared.isFrontmostMode = true
@@ -97,8 +96,9 @@ class DesktopWindow: NSWindow {
     }
     
     func sendToDesktopLayer() {
-        // Just above desktop icons so it receives clicks/scrolls, but stays BEHIND all normal apps (.normal = 0)
-        self.level = NSWindow.Level(Int(CGWindowLevelForKey(.desktopIconWindow)) + 1)
+        // Pure non-interactive desktop wallpaper widget layer
+        self.level = .init(Int(CGWindowLevelForKey(.desktopWindow)))
+        self.ignoresMouseEvents = true
         self.isMovableByWindowBackground = false
         self.isFrontmostMode = false
         AppSettings.shared.isFrontmostMode = false
