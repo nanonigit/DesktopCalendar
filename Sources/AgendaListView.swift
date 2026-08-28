@@ -31,19 +31,34 @@ struct AgendaListView: View {
         return formatter.string(from: currentTime)
     }
     
-    // Earliest event hour across displayed dates for smart initial scroll
-    private var initialScrollHour: Int {
-        var earliest = currentHour - 1
+    // Smart Auto-Scroll: Automatically focuses on the most relevant active/upcoming events and current time
+    private var smartScrollHour: Int {
+        let calendar = Calendar.current
+        let nowHour = currentHour
+        var bestHour = max(0, nowHour - 1)
+        
         for date in displayedDates {
             let timed = calendarManager.events(for: date).filter { !$0.isAllDay }
             for e in timed {
-                let hour = Calendar.current.component(.hour, from: e.startDate)
-                if hour < earliest {
-                    earliest = hour
+                let startHour = calendar.component(.hour, from: e.startDate)
+                let endHour = calendar.component(.hour, from: e.endDate)
+                
+                if calendar.isDateInToday(date) {
+                    // Include events that are currently active or started recently
+                    if endHour >= nowHour {
+                        if startHour < bestHour {
+                            bestHour = startHour
+                        }
+                    }
+                } else if date > Date() {
+                    // For upcoming days, ensure morning events are visible
+                    if startHour < bestHour {
+                        bestHour = startHour
+                    }
                 }
             }
         }
-        return max(0, min(earliest, 20))
+        return max(0, min(bestHour, 20))
     }
     
     private func getMinutesSinceMidnight(_ d: Date) -> Int {
@@ -156,9 +171,9 @@ struct AgendaListView: View {
                     .background(Color.white.opacity(0.12))
             }
             
-            // 3. 24-Hour Scrollable Grid (0:00 to 23:00)
+            // 3. 24-Hour Scrollable Grid (0:00 to 23:00) with Smart Auto-Focus
             ScrollViewReader { proxy in
-                ScrollView(.vertical, showsIndicators: true) {
+                ScrollView(.vertical, showsIndicators: false) {
                     HStack(alignment: .top, spacing: 0) {
                         // Left Hour Labels Column (0:00 - 23:00) + Live Now Badge
                         ZStack(alignment: .topTrailing) {
@@ -242,7 +257,9 @@ struct AgendaListView: View {
                     .padding(.top, 4)
                 }
                 .onAppear {
-                    proxy.scrollTo("hour_\(initialScrollHour)", anchor: .top)
+                    withAnimation(.easeInOut(duration: 0.4)) {
+                        proxy.scrollTo("hour_\(smartScrollHour)", anchor: .top)
+                    }
                 }
                 .onReceive(timer) { newTime in
                     self.currentTime = newTime
