@@ -20,6 +20,8 @@ class DesktopWindow: NSWindow {
         self.isOpaque = false
         self.hasShadow = true
         self.isMovableByWindowBackground = true
+        self.ignoresMouseEvents = false
+        self.acceptsMouseMovedEvents = true
         self.minSize = NSSize(width: 300, height: 250)
         self.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
         
@@ -94,7 +96,8 @@ class DesktopWindow: NSWindow {
     }
     
     func sendToDesktopLayer() {
-        self.level = .init(Int(CGWindowLevelForKey(.desktopWindow)))
+        // Just above desktop icons so it receives clicks/scrolls, but stays BEHIND all normal apps (.normal = 0)
+        self.level = NSWindow.Level(Int(CGWindowLevelForKey(.desktopIconWindow)) + 1)
         self.isFrontmostMode = false
         AppSettings.shared.isFrontmostMode = false
     }
