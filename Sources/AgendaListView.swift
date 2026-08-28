@@ -1,10 +1,14 @@
 import SwiftUI
 import EventKit
+import Combine
 
 struct AgendaListView: View {
     @ObservedObject var settings: AppSettings
     @ObservedObject var calendarManager: CalendarManager
     @ObservedObject var weatherManager: WeatherManager = WeatherManager.shared
+    
+    @State private var currentTime: Date = Date()
+    private let timer = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
     
     private let hourHeight: CGFloat = 40.0
     private let totalHours: Int = 24
@@ -17,7 +21,14 @@ struct AgendaListView: View {
     }
     
     private var currentHour: Int {
-        Calendar.current.component(.hour, from: Date())
+        Calendar.current.component(.hour, from: currentTime)
+    }
+    
+    private var currentTimeString: String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ja_JP")
+        formatter.dateFormat = settings.is24HourFormat ? "HH:mm" : "h:mm a"
+        return formatter.string(from: currentTime)
     }
     
     // Earliest event hour across displayed dates for smart initial scroll
@@ -37,10 +48,44 @@ struct AgendaListView: View {
     
     var body: some View {
         VStack(spacing: 0) {
+            // 0. Location & Live Current Time Header Bar
+            HStack(spacing: 4) {
+                // Location & Timezone Indicator
+                HStack(spacing: 3) {
+                    Image(systemName: "location.fill")
+                        .font(.system(size: 8.5))
+                        .foregroundColor(.accentColor)
+                    
+                    Text(weatherManager.fullLocationLabel.isEmpty ? "現在地 (JST)" : weatherManager.fullLocationLabel)
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(.primary.opacity(0.9))
+                        .lineLimit(1)
+                }
+                
+                Spacer()
+                
+                // Live Current Clock Badge
+                HStack(spacing: 3) {
+                    Circle()
+                        .fill(Color.red)
+                        .frame(width: 6, height: 6)
+                    
+                    Text("現在: " + currentTimeString)
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .foregroundColor(.red)
+                }
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(Color.red.opacity(0.12))
+                .cornerRadius(5)
+            }
+            .padding(.horizontal, 4)
+            .padding(.bottom, 6)
+            
             // 1. Day Headers Row (Apple Calendar Style with Weather & Sat/Sun colors)
             HStack(spacing: 0) {
                 // Left spacer matching hour label width
-                Color.clear.frame(width: 38)
+                Color.clear.frame(width: 44)
                 
                 ForEach(displayedDates, id: \.self) { date in
                     AppleCalendarDayHeader(
@@ -50,7 +95,7 @@ struct AgendaListView: View {
                     .frame(maxWidth: .infinity)
                 }
             }
-            .frame(height: 44)
+            .frame(height: 42)
             .padding(.bottom, 2)
             
             // 2. All-Day Events Section (Between Date Headers & 24h Timeline)
@@ -64,7 +109,7 @@ struct AgendaListView: View {
                         Text("終日")
                             .font(.system(size: 9, weight: .bold))
                             .foregroundColor(.secondary.opacity(0.9))
-                            .frame(width: 38, alignment: .trailing)
+                            .frame(width: 44, alignment: .trailing)
                             .padding(.trailing, 4)
                             .padding(.top, 4)
                         
@@ -110,18 +155,36 @@ struct AgendaListView: View {
             ScrollViewReader { proxy in
                 ScrollView(.vertical, showsIndicators: true) {
                     HStack(alignment: .top, spacing: 0) {
-                        // Left Hour Labels Column (0:00 - 23:00)
-                        VStack(spacing: 0) {
-                            ForEach(0..<totalHours, id: \.self) { hour in
-                                Text(formatHour(hour))
-                                    .font(.system(size: 9.5, weight: .semibold, design: .rounded))
-                                    .foregroundColor(.white.opacity(0.7))
-                                    .frame(width: 34, height: hourHeight, alignment: .topTrailing)
-                                    .offset(y: -6)
-                                    .id("hour_\(hour)")
+                        // Left Hour Labels Column (0:00 - 23:00) + Live Now Badge
+                        ZStack(alignment: .topTrailing) {
+                            VStack(spacing: 0) {
+                                ForEach(0..<totalHours, id: \.self) { hour in
+                                    Text(formatHour(hour))
+                                        .font(.system(size: 9.5, weight: .semibold, design: .rounded))
+                                        .foregroundColor(.white.opacity(0.7))
+                                        .frame(width: 40, height: hourHeight, alignment: .topTrailing)
+                                        .offset(y: -6)
+                                        .id("hour_\(hour)")
+                                }
+                            }
+                            
+                            // Red Current Time Badge on Hour Axis (if displayed dates contains today)
+                            if displayedDates.contains(where: { Calendar.current.isDateInToday($0) }) {
+                                let minutesSinceMidnight = getMinutesSinceMidnight(currentTime)
+                                let yOffset = CGFloat(minutesSinceMidnight) / 60.0 * hourHeight
+                                
+                                Text(currentTimeString)
+                                    .font(.system(size: 8.5, weight: .bold, design: .monospaced))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 3.5)
+                                    .padding(.vertical, 1)
+                                    .background(Color.red)
+                                    .cornerRadius(3)
+                                    .offset(y: yOffset - 7)
+                                    .zIndex(30)
                             }
                         }
-                        .frame(width: 38)
+                        .frame(width: 44)
                         
                         // Multi-Day Columns Area
                         ZStack(alignment: .topLeading) {
@@ -153,6 +216,7 @@ struct AgendaListView: View {
                                         date: date,
                                         hourHeight: hourHeight,
                                         totalHours: totalHours,
+                                        currentTime: currentTime,
                                         events: calendarManager.events(for: date),
                                         is24HourFormat: settings.is24HourFormat,
                                         showWeather: settings.showWeather,
@@ -175,12 +239,17 @@ struct AgendaListView: View {
                 .onAppear {
                     proxy.scrollTo("hour_\(initialScrollHour)", anchor: .top)
                 }
-                .onChange(of: settings.selectedDate) { _ in
-                    proxy.scrollTo("hour_\(initialScrollHour)", anchor: .top)
+                .onReceive(timer) { newTime in
+                    self.currentTime = newTime
                 }
             }
         }
         .frame(maxHeight: .infinity, alignment: .top)
+    }
+    
+    private func getMinutesSinceMidnight(_ d: Date) -> Int {
+        let comp = Calendar.current.dateComponents([.hour, .minute], from: d)
+        return (comp.hour ?? 0) * 60 + (comp.minute ?? 0)
     }
     
     private func formatHour(_ hour: Int) -> String {
@@ -288,6 +357,7 @@ struct DayTimelineColumn: View {
     let date: Date
     let hourHeight: CGFloat
     let totalHours: Int
+    let currentTime: Date
     let events: [EKEvent]
     let is24HourFormat: Bool
     let showWeather: Bool
@@ -336,20 +406,21 @@ struct DayTimelineColumn: View {
                 }
             }
             
-            // Current Time Line (Red Now Line)
+            // Current Time Line (Red Now Line with Glowing indicator)
             if isToday {
-                let minutesSinceMidnight = getMinutesSinceMidnight(Date())
+                let minutesSinceMidnight = getMinutesSinceMidnight(currentTime)
                 let yOffset = CGFloat(minutesSinceMidnight) / 60.0 * hourHeight
                 
                 HStack(spacing: 0) {
                     Circle()
                         .fill(Color.red)
-                        .frame(width: 6, height: 6)
+                        .frame(width: 7, height: 7)
+                        .shadow(color: .red.opacity(0.8), radius: 3)
                     Rectangle()
                         .fill(Color.red)
                         .frame(height: 1.5)
                 }
-                .offset(y: yOffset - 3)
+                .offset(y: yOffset - 3.5)
                 .zIndex(20)
             }
             
