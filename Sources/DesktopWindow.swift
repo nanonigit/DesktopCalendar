@@ -10,7 +10,7 @@ class DesktopWindow: NSWindow {
     init(contentRect: NSRect) {
         super.init(
             contentRect: contentRect,
-            styleMask: [.borderless, .resizable],
+            styleMask: [.borderless],
             backing: .buffered,
             defer: false
         )
@@ -19,7 +19,6 @@ class DesktopWindow: NSWindow {
         self.backgroundColor = .clear
         self.isOpaque = false
         self.hasShadow = true
-        self.isMovableByWindowBackground = true
         self.ignoresMouseEvents = false
         self.acceptsMouseMovedEvents = true
         self.minSize = NSSize(width: 300, height: 250)
@@ -90,6 +89,8 @@ class DesktopWindow: NSWindow {
     
     func bringToFrontForInteraction() {
         self.level = .floating
+        self.styleMask.insert(.resizable)
+        self.isMovableByWindowBackground = true
         self.isFrontmostMode = true
         AppSettings.shared.isFrontmostMode = true
         self.makeKeyAndOrderFront(nil)
@@ -98,6 +99,8 @@ class DesktopWindow: NSWindow {
     func sendToDesktopLayer() {
         // Just above desktop icons so it receives clicks/scrolls, but stays BEHIND all normal apps (.normal = 0)
         self.level = NSWindow.Level(Int(CGWindowLevelForKey(.desktopIconWindow)) + 1)
+        self.styleMask.remove(.resizable)
+        self.isMovableByWindowBackground = false
         self.isFrontmostMode = false
         AppSettings.shared.isFrontmostMode = false
     }
