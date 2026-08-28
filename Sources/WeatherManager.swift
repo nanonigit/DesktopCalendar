@@ -30,11 +30,60 @@ struct DayWeather: Identifiable {
     let minTemp: Int
     
     var iconName: String {
-        switch weatherCode {
+        WeatherManager.weatherIcon(for: weatherCode)
+    }
+    
+    var iconColor: Color {
+        WeatherManager.weatherColor(for: weatherCode)
+    }
+}
+
+struct HourlyWeather: Identifiable {
+    let id = UUID()
+    let dateString: String // "yyyy-MM-dd"
+    let hour: Int          // 0...23
+    let weatherCode: Int
+    let temp: Int
+    
+    var iconName: String {
+        WeatherManager.weatherIcon(for: weatherCode, hour: hour)
+    }
+    
+    var iconColor: Color {
+        WeatherManager.weatherColor(for: weatherCode)
+    }
+}
+
+class WeatherManager: NSObject, ObservableObject, CLLocationManagerDelegate {
+    static let shared = WeatherManager()
+    
+    @Published var dailyForecasts: [String: DayWeather] = [:]
+    @Published var hourlyForecasts: [String: [Int: HourlyWeather]] = [:]
+    @Published var locationName: String = "検出中..."
+    @Published var timezoneInfo: String = ""
+    @Published var fullLocationLabel: String = ""
+    @Published var isRefreshing: Bool = false
+    
+    @Published var searchResults: [GeocodingCityResult] = []
+    @Published var isSearching: Bool = false
+    
+    private var locationManager: CLLocationManager?
+    private let geocoder = CLGeocoder()
+    
+    override init() {
+        super.init()
+        setupLocationManager()
+        fetchWeather()
+    }
+    
+    static func weatherIcon(for code: Int, hour: Int? = nil) -> String {
+        let isNight = (hour != nil) ? (hour! < 6 || hour! >= 19) : false
+        
+        switch code {
         case 0:
-            return "sun.max.fill"
+            return isNight ? "moon.stars.fill" : "sun.max.fill"
         case 1, 2:
-            return "cloud.sun.fill"
+            return isNight ? "cloud.moon.fill" : "cloud.sun.fill"
         case 3:
             return "cloud.fill"
         case 45, 48:
@@ -52,12 +101,12 @@ struct DayWeather: Identifiable {
         case 95, 96, 99:
             return "cloud.bolt.rain.fill"
         default:
-            return "sun.max.fill"
+            return isNight ? "moon.fill" : "sun.max.fill"
         }
     }
     
-    var iconColor: Color {
-        switch weatherCode {
+    static func weatherColor(for code: Int) -> Color {
+        switch code {
         case 0:
             return Color(red: 1.0, green: 0.75, blue: 0.1)
         case 1, 2:
@@ -73,28 +122,6 @@ struct DayWeather: Identifiable {
         default:
             return Color.yellow
         }
-    }
-}
-
-class WeatherManager: NSObject, ObservableObject, CLLocationManagerDelegate {
-    static let shared = WeatherManager()
-    
-    @Published var dailyForecasts: [String: DayWeather] = [:]
-    @Published var locationName: String = "検出中..."
-    @Published var timezoneInfo: String = ""
-    @Published var fullLocationLabel: String = ""
-    @Published var isRefreshing: Bool = false
-    
-    @Published var searchResults: [GeocodingCityResult] = []
-    @Published var isSearching: Bool = false
-    
-    private var locationManager: CLLocationManager?
-    private let geocoder = CLGeocoder()
-    
-    override init() {
-        super.init()
-        setupLocationManager()
-        fetchWeather()
     }
     
     private func setupLocationManager() {
@@ -256,7 +283,7 @@ class WeatherManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     
     private func fetchForecast(lat: Double, lon: Double, timezone: String) {
         let tzEncoded = timezone.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "Asia/Tokyo"
-        let urlStr = "https://api.open-meteo.com/v1/forecast?latitude=\(lat)&longitude=\(lon)&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=\(tzEncoded)"
+        let urlStr = "https://api.open-meteo.com/v1/forecast?latitude=\(lat)&longitude=\(lon)&daily=weathercode,temperature_2m_max,temperature_2m_min&hourly=weathercode,temperature_2m&timezone=\(tzEncoded)"
         
         guard let url = URL(string: urlStr) else {
             DispatchQueue.main.async { self.isRefreshing = false }
@@ -271,29 +298,65 @@ class WeatherManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             }
             
             guard let data = data,
-                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let daily = json["daily"] as? [String: Any],
-                  let times = daily["time"] as? [String],
-                  let codes = daily["weathercode"] as? [Int],
-                  let maxTemps = daily["temperature_2m_max"] as? [Double],
-                  let minTemps = daily["temperature_2m_min"] as? [Double] else {
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
                 return
             }
             
-            var dict: [String: DayWeather] = [:]
-            for i in 0..<times.count {
-                guard i < codes.count, i < maxTemps.count, i < minTemps.count else { break }
-                let item = DayWeather(
-                    dateString: times[i],
-                    weatherCode: codes[i],
-                    maxTemp: Int(round(maxTemps[i])),
-                    minTemp: Int(round(minTemps[i]))
-                )
-                dict[times[i]] = item
+            // 1. Parse Daily Forecast
+            if let daily = json["daily"] as? [String: Any],
+               let times = daily["time"] as? [String],
+               let codes = daily["weathercode"] as? [Int],
+               let maxTemps = daily["temperature_2m_max"] as? [Double],
+               let minTemps = daily["temperature_2m_min"] as? [Double] {
+                
+                var dict: [String: DayWeather] = [:]
+                for i in 0..<times.count {
+                    guard i < codes.count, i < maxTemps.count, i < minTemps.count else { break }
+                    let item = DayWeather(
+                        dateString: times[i],
+                        weatherCode: codes[i],
+                        maxTemp: Int(round(maxTemps[i])),
+                        minTemp: Int(round(minTemps[i]))
+                    )
+                    dict[times[i]] = item
+                }
+                
+                DispatchQueue.main.async {
+                    self?.dailyForecasts = dict
+                }
             }
             
-            DispatchQueue.main.async {
-                self?.dailyForecasts = dict
+            // 2. Parse Hourly Forecast
+            if let hourly = json["hourly"] as? [String: Any],
+               let hTimes = hourly["time"] as? [String],
+               let hCodes = hourly["weathercode"] as? [Int],
+               let hTemps = hourly["temperature_2m"] as? [Double] {
+                
+                var hDict: [String: [Int: HourlyWeather]] = [:]
+                for i in 0..<hTimes.count {
+                    guard i < hCodes.count, i < hTemps.count else { break }
+                    let rawTime = hTimes[i] // e.g. "2026-08-28T14:00"
+                    let parts = rawTime.split(separator: "T")
+                    guard parts.count == 2 else { continue }
+                    let datePart = String(parts[0])
+                    let hourPart = parts[1].split(separator: ":").first.flatMap { Int($0) } ?? 0
+                    
+                    let item = HourlyWeather(
+                        dateString: datePart,
+                        hour: hourPart,
+                        weatherCode: hCodes[i],
+                        temp: Int(round(hTemps[i]))
+                    )
+                    
+                    if hDict[datePart] == nil {
+                        hDict[datePart] = [:]
+                    }
+                    hDict[datePart]?[hourPart] = item
+                }
+                
+                DispatchQueue.main.async {
+                    self?.hourlyForecasts = hDict
+                }
             }
         }.resume()
     }
@@ -370,5 +433,12 @@ class WeatherManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         formatter.dateFormat = "yyyy-MM-dd"
         let key = formatter.string(from: date)
         return dailyForecasts[key]
+    }
+    
+    func hourlyForecast(for date: Date, hour: Int) -> HourlyWeather? {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        let key = formatter.string(from: date)
+        return hourlyForecasts[key]?[hour]
     }
 }

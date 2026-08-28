@@ -70,7 +70,7 @@ struct AgendaListView: View {
                 .padding(.bottom, 2)
             }
             
-            // 24-Hour Scrollable Grid (High-visibility lines)
+            // 24-Hour Scrollable Grid (High-visibility lines + Hourly Weather)
             ScrollViewReader { proxy in
                 ScrollView(.vertical, showsIndicators: true) {
                     HStack(alignment: .top, spacing: 0) {
@@ -118,7 +118,9 @@ struct AgendaListView: View {
                                         hourHeight: hourHeight,
                                         totalHours: totalHours,
                                         events: calendarManager.events(for: date),
-                                        is24HourFormat: settings.is24HourFormat
+                                        is24HourFormat: settings.is24HourFormat,
+                                        showWeather: settings.showWeather,
+                                        weatherManager: weatherManager
                                     )
                                     .frame(maxWidth: .infinity)
                                     
@@ -227,7 +229,7 @@ struct AppleCalendarDayHeader: View {
                     }
                 }
                 
-                // Weather Forecast Badge
+                // Day Weather Forecast Badge (Icon + Max/Min)
                 if let w = weather {
                     HStack(spacing: 2) {
                         Image(systemName: w.iconName)
@@ -250,6 +252,8 @@ struct DayTimelineColumn: View {
     let totalHours: Int
     let events: [EKEvent]
     let is24HourFormat: Bool
+    let showWeather: Bool
+    let weatherManager: WeatherManager
     
     private var timedEvents: [EKEvent] {
         events.filter { !$0.isAllDay }
@@ -263,6 +267,36 @@ struct DayTimelineColumn: View {
         ZStack(alignment: .topLeading) {
             Color.clear
                 .frame(height: CGFloat(totalHours) * hourHeight)
+            
+            // Hourly Weather Layer (Subtle badges at every 3-hour intervals: 0, 3, 6, 9, 12, 15, 18, 21)
+            if showWeather {
+                ForEach(0..<totalHours, id: \.self) { hour in
+                    if (hour % 3 == 0),
+                       let hw = weatherManager.hourlyForecast(for: date, hour: hour) {
+                        let yOffset = CGFloat(hour) * hourHeight
+                        HStack(spacing: 2) {
+                            Spacer()
+                            
+                            HStack(spacing: 2.5) {
+                                Image(systemName: hw.iconName)
+                                    .font(.system(size: 8))
+                                    .foregroundColor(hw.iconColor.opacity(0.9))
+                                
+                                Text("\(hw.temp)°")
+                                    .font(.system(size: 8.5, weight: .semibold, design: .rounded))
+                                    .foregroundColor(.white.opacity(0.55))
+                            }
+                            .padding(.horizontal, 3.5)
+                            .padding(.vertical, 1.5)
+                            .background(Color.black.opacity(0.25))
+                            .cornerRadius(3.5)
+                            .padding(.trailing, 3)
+                        }
+                        .frame(height: 16)
+                        .offset(y: yOffset + 2)
+                    }
+                }
+            }
             
             // Current Time Line (Red Now Line)
             if isToday {
@@ -310,9 +344,11 @@ struct DayTimelineColumn: View {
                 .background(
                     RoundedRectangle(cornerRadius: 5, style: .continuous)
                         .fill(calColor.opacity(0.9))
+                        .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
                 )
                 .padding(.horizontal, 2)
                 .offset(y: yOffset)
+                .zIndex(10)
             }
         }
     }
