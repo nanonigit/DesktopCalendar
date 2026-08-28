@@ -37,7 +37,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         window.makeKeyAndOrderFront(nil)
         self.desktopWindow = window
         
-        setupMenuBarItem()
+        updateMenuBarItem()
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleMenuBarVisibilityChange),
+            name: Notification.Name("MenuBarVisibilityChanged"),
+            object: nil
+        )
     }
     
     // Allows Raycast, Spotlight, or Dock/Finder to reopen management screen even if menu bar icon is hidden!
@@ -46,15 +53,28 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return true
     }
     
-    func setupMenuBarItem() {
-        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        if let button = item.button {
-            button.image = NSImage(systemSymbolName: "calendar", accessibilityDescription: "DesktopCalendar")
+    @objc func handleMenuBarVisibilityChange() {
+        updateMenuBarItem()
+    }
+    
+    func updateMenuBarItem() {
+        let settings = AppSettings.shared
+        if settings.showMenuBarExtra {
+            if statusItem == nil {
+                let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+                if let button = item.button {
+                    button.image = NSImage(systemSymbolName: "calendar", accessibilityDescription: "DesktopCalendar")
+                }
+                menu.delegate = self
+                item.menu = menu
+                self.statusItem = item
+            }
+        } else {
+            if let item = statusItem {
+                NSStatusBar.system.removeStatusItem(item)
+                self.statusItem = nil
+            }
         }
-        
-        menu.delegate = self
-        item.menu = menu
-        self.statusItem = item
     }
     
     func menuNeedsUpdate(_ menu: NSMenu) {
@@ -175,13 +195,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             let window = NSWindow(contentViewController: hosting)
             window.title = "DesktopCalendar 設定"
             window.styleMask = [.titled, .closable, .resizable]
-            window.setContentSize(NSSize(width: 500, height: 640))
+            window.setContentSize(NSSize(width: 500, height: 660))
             window.minSize = NSSize(width: 480, height: 420)
             window.center()
             window.isReleasedWhenClosed = false
             self.settingsWindow = window
         }
-        // Keep desktop calendar strictly in the background; only bring settingsWindow to front
         settingsWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }

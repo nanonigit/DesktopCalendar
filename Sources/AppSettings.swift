@@ -49,6 +49,12 @@ class AppSettings: ObservableObject {
     
     @AppStorage("timelineDaysCount") var timelineDaysCount: Int = 1 // 1, 2, or 3 days
     
+    @AppStorage("showMenuBarExtra") var showMenuBarExtra: Bool = true {
+        didSet {
+            NotificationCenter.default.post(name: Notification.Name("MenuBarVisibilityChanged"), object: nil)
+        }
+    }
+    
     var reminderDateRange: ReminderDateRange {
         get { ReminderDateRange(rawValue: reminderDateRangeRaw) ?? .all }
         set {
@@ -57,7 +63,6 @@ class AppSettings: ObservableObject {
         }
     }
     
-    @AppStorage("showMenuBarExtra") var showMenuBarExtra: Bool = true
     @AppStorage("launchAtLogin") var launchAtLogin: Bool = true
     
     @AppStorage("disabledCalendarIDs") var disabledCalendarIDsJSON: String = "[]"

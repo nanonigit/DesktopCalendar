@@ -245,6 +245,15 @@ struct SettingsView: View {
                         Text("⚙️ システム設定")
                             .font(.headline)
                         
+                        Toggle("メニューバーにアイコンを表示する", isOn: $settings.showMenuBarExtra)
+                        
+                        if !settings.showMenuBarExtra {
+                            Text("※ メニューバーアイコンを非表示にしても、RaycastやSpotlightから「DesktopCalendar」を開くことでいつでもこの設定画面を表示できます。")
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary.opacity(0.85))
+                                .padding(.vertical, 2)
+                        }
+                        
                         Toggle("Mac起動時に自動で起動する（ログイン項目）", isOn: Binding(
                             get: { settings.launchAtLogin },
                             set: { val in settings.setLaunchAtLogin(val) }
@@ -269,7 +278,7 @@ struct SettingsView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .padding(20)
-        .frame(width: 500, height: 640)
+        .frame(width: 500, height: 660)
         .background(VisualEffectView(material: .hudWindow, blendingMode: .behindWindow))
     }
     
