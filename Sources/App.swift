@@ -181,7 +181,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             window.isReleasedWhenClosed = false
             self.settingsWindow = window
         }
-        desktopWindow?.bringToFrontForInteraction()
+        // Keep desktop calendar strictly in the background; only bring settingsWindow to front
         settingsWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
