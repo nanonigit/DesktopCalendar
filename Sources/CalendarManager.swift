@@ -95,8 +95,8 @@ class CalendarManager: ObservableObject {
         if enabledCalendars.isEmpty {
             self.events = []
         } else {
-            let startDate = calendar.date(byAdding: .day, value: -15, to: monthInterval.start) ?? monthInterval.start
-            let endDate = calendar.date(byAdding: .day, value: 45, to: monthInterval.end) ?? monthInterval.end
+            let startDate = calendar.date(byAdding: .day, value: -30, to: monthInterval.start) ?? monthInterval.start
+            let endDate = calendar.date(byAdding: .day, value: 60, to: monthInterval.end) ?? monthInterval.end
             
             let predicate = store.predicateForEvents(withStart: startDate, end: endDate, calendars: enabledCalendars)
             let fetchedEvents = store.events(matching: predicate).sorted { $0.startDate < $1.startDate }
@@ -139,12 +139,13 @@ class CalendarManager: ObservableObject {
     
     func events(for date: Date) -> [EKEvent] {
         let calendar = Calendar.current
+        guard let dayInterval = calendar.dateInterval(of: .day, for: date) else { return [] }
+        
         return events.filter { event in
             if event.isAllDay {
-                return calendar.isDate(event.startDate, inSameDayAs: date) ||
-                       (event.startDate <= date && date <= event.endDate)
+                return (event.startDate < dayInterval.end) && (event.endDate > dayInterval.start)
             } else {
-                return calendar.isDate(event.startDate, inSameDayAs: date)
+                return (event.startDate < dayInterval.end) && (event.endDate > dayInterval.start)
             }
         }
     }

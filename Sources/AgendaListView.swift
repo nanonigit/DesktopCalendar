@@ -20,11 +20,26 @@ struct AgendaListView: View {
         Calendar.current.component(.hour, from: Date())
     }
     
+    // Earliest event hour across displayed dates for smart initial scroll
+    private var initialScrollHour: Int {
+        var earliest = currentHour - 1
+        for date in displayedDates {
+            let timed = calendarManager.events(for: date).filter { !$0.isAllDay }
+            for e in timed {
+                let hour = Calendar.current.component(.hour, from: e.startDate)
+                if hour < earliest {
+                    earliest = hour
+                }
+            }
+        }
+        return max(0, min(earliest, 20))
+    }
+    
     var body: some View {
-        VStack(spacing: 4) {
-            // Day Headers Row (Apple Calendar Style with Weather & Sat/Sun colors)
+        VStack(spacing: 0) {
+            // 1. Day Headers Row (Apple Calendar Style with Weather & Sat/Sun colors)
             HStack(spacing: 0) {
-                // Left spacer for hour labels
+                // Left spacer matching hour label width
                 Color.clear.frame(width: 38)
                 
                 ForEach(displayedDates, id: \.self) { date in
@@ -36,45 +51,66 @@ struct AgendaListView: View {
                 }
             }
             .frame(height: 44)
+            .padding(.bottom, 2)
             
-            // All-Day Events Row (if any)
+            // 2. All-Day Events Section (Between Date Headers & 24h Timeline)
             let hasAnyAllDay = displayedDates.contains { !calendarManager.events(for: $0).filter { $0.isAllDay }.isEmpty }
             if hasAnyAllDay {
-                HStack(spacing: 0) {
-                    Text("終日")
-                        .font(.system(size: 9, weight: .semibold))
-                        .foregroundColor(.secondary)
-                        .frame(width: 38, alignment: .trailing)
-                        .padding(.trailing, 4)
+                VStack(spacing: 0) {
+                    Divider()
+                        .background(Color.white.opacity(0.12))
                     
-                    ForEach(displayedDates, id: \.self) { date in
-                        let allDayList = calendarManager.events(for: date).filter { $0.isAllDay }
-                        VStack(spacing: 2) {
-                            ForEach(allDayList, id: \.eventIdentifier) { event in
-                                let calColor = Color(nsColor: NSColor(cgColor: event.calendar.cgColor) ?? .systemBlue)
-                                Text(event.title ?? "終日予定")
-                                    .font(.system(size: 10, weight: .bold))
-                                    .foregroundColor(.white)
-                                    .lineLimit(1)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(calColor.opacity(0.9))
-                                    .cornerRadius(4)
+                    HStack(alignment: .top, spacing: 0) {
+                        Text("終日")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(.secondary.opacity(0.9))
+                            .frame(width: 38, alignment: .trailing)
+                            .padding(.trailing, 4)
+                            .padding(.top, 4)
+                        
+                        ForEach(displayedDates, id: \.self) { date in
+                            let allDayList = calendarManager.events(for: date).filter { $0.isAllDay }
+                            VStack(spacing: 3) {
+                                if allDayList.isEmpty {
+                                    Color.clear.frame(height: 4)
+                                } else {
+                                    ForEach(allDayList, id: \.eventIdentifier) { event in
+                                        let calColor = Color(nsColor: NSColor(cgColor: event.calendar.cgColor) ?? .systemBlue)
+                                        Text(event.title ?? "終日予定")
+                                            .font(.system(size: 10, weight: .bold))
+                                            .foregroundColor(.white)
+                                            .lineLimit(1)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                            .padding(.horizontal, 6)
+                                            .padding(.vertical, 2.5)
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                                    .fill(calColor.opacity(0.9))
+                                            )
+                                    }
+                                }
                             }
+                            .frame(maxWidth: .infinity)
+                            .padding(.horizontal, 2)
+                            .padding(.vertical, 3)
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding(.horizontal, 2)
                     }
+                    .padding(.vertical, 2)
+                    .background(Color.white.opacity(0.03))
+                    
+                    Divider()
+                        .background(Color.white.opacity(0.12))
                 }
-                .padding(.bottom, 2)
+            } else {
+                Divider()
+                    .background(Color.white.opacity(0.12))
             }
             
-            // 24-Hour Scrollable Grid (High-visibility lines + Hourly Weather)
+            // 3. 24-Hour Scrollable Grid (0:00 to 23:00)
             ScrollViewReader { proxy in
                 ScrollView(.vertical, showsIndicators: true) {
                     HStack(alignment: .top, spacing: 0) {
-                        // Left Hour Labels Column
+                        // Left Hour Labels Column (0:00 - 23:00)
                         VStack(spacing: 0) {
                             ForEach(0..<totalHours, id: \.self) { hour in
                                 Text(formatHour(hour))
@@ -137,8 +173,10 @@ struct AgendaListView: View {
                     .padding(.top, 4)
                 }
                 .onAppear {
-                    let targetHour = max(0, min(currentHour - 1, 20))
-                    proxy.scrollTo("hour_\(targetHour)", anchor: .top)
+                    proxy.scrollTo("hour_\(initialScrollHour)", anchor: .top)
+                }
+                .onChange(of: settings.selectedDate) { _ in
+                    proxy.scrollTo("hour_\(initialScrollHour)", anchor: .top)
                 }
             }
         }
