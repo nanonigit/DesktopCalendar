@@ -2,6 +2,15 @@ import SwiftUI
 import EventKit
 import Combine
 
+struct LayoutEvent: Identifiable {
+    let id: String
+    let event: EKEvent
+    let startMinutes: Int
+    let durationMinutes: Int
+    let column: Int
+    let totalColumns: Int
+}
+
 struct AgendaListView: View {
     @ObservedObject var settings: AppSettings
     @ObservedObject var calendarManager: CalendarManager
@@ -44,14 +53,12 @@ struct AgendaListView: View {
                 let endHour = calendar.component(.hour, from: e.endDate)
                 
                 if calendar.isDateInToday(date) {
-                    // Include events that are currently active or started recently
                     if endHour >= nowHour {
                         if startHour < bestHour {
                             bestHour = startHour
                         }
                     }
                 } else if date > Date() {
-                    // For upcoming days, ensure morning events are visible
                     if startHour < bestHour {
                         bestHour = startHour
                     }
@@ -399,94 +406,100 @@ struct DayTimelineColumn: View {
     }
     
     var body: some View {
-        ZStack(alignment: .topLeading) {
-            Color.clear
-                .frame(height: CGFloat(totalHours) * hourHeight)
+        GeometryReader { geometry in
+            let availableWidth = geometry.size.width
+            let layoutEvents = computeEventLayout(timedEvents)
             
-            // Hourly Weather Layer (Subtle badges at every 3-hour intervals: 0, 3, 6, 9, 12, 15, 18, 21)
-            if showWeather {
-                ForEach(0..<totalHours, id: \.self) { hour in
-                    if (hour % 3 == 0),
-                       let hw = weatherManager.hourlyForecast(for: date, hour: hour) {
-                        let yOffset = CGFloat(hour) * hourHeight
-                        HStack(spacing: 2) {
-                            Spacer()
-                            
-                            HStack(spacing: 2.5) {
-                                Image(systemName: hw.iconName)
-                                    .font(.system(size: 8))
-                                    .foregroundColor(hw.iconColor.opacity(0.9))
+            ZStack(alignment: .topLeading) {
+                Color.clear
+                    .frame(height: CGFloat(totalHours) * hourHeight)
+                
+                // Hourly Weather Layer (Subtle badges at every 3-hour intervals: 0, 3, 6, 9, 12, 15, 18, 21)
+                if showWeather {
+                    ForEach(0..<totalHours, id: \.self) { hour in
+                        if (hour % 3 == 0),
+                           let hw = weatherManager.hourlyForecast(for: date, hour: hour) {
+                            let yOffset = CGFloat(hour) * hourHeight
+                            HStack(spacing: 2) {
+                                Spacer()
                                 
-                                Text("\(hw.temp)°")
-                                    .font(.system(size: 8.5, weight: .semibold, design: .rounded))
-                                    .foregroundColor(.white.opacity(0.55))
+                                HStack(spacing: 2.5) {
+                                    Image(systemName: hw.iconName)
+                                        .font(.system(size: 8))
+                                        .foregroundColor(hw.iconColor.opacity(0.9))
+                                    
+                                    Text("\(hw.temp)°")
+                                        .font(.system(size: 8.5, weight: .semibold, design: .rounded))
+                                        .foregroundColor(.white.opacity(0.55))
+                                }
+                                .padding(.horizontal, 3.5)
+                                .padding(.vertical, 1.5)
+                                .background(Color.black.opacity(0.25))
+                                .cornerRadius(3.5)
+                                .padding(.trailing, 3)
                             }
-                            .padding(.horizontal, 3.5)
-                            .padding(.vertical, 1.5)
-                            .background(Color.black.opacity(0.25))
-                            .cornerRadius(3.5)
-                            .padding(.trailing, 3)
+                            .frame(height: 16)
+                            .offset(y: yOffset + 2)
                         }
-                        .frame(height: 16)
-                        .offset(y: yOffset + 2)
                     }
                 }
-            }
-            
-            // Current Time Line (Red Now Line with Glowing indicator)
-            if isToday {
-                let minutesSinceMidnight = getMinutesSinceMidnight(currentTime)
-                let yOffset = CGFloat(minutesSinceMidnight) / 60.0 * hourHeight
                 
-                HStack(spacing: 0) {
-                    Circle()
-                        .fill(Color.red)
-                        .frame(width: 7, height: 7)
-                        .shadow(color: .red.opacity(0.8), radius: 3)
-                    Rectangle()
-                        .fill(Color.red)
-                        .frame(height: 1.5)
-                }
-                .offset(y: yOffset - 3.5)
-                .zIndex(20)
-            }
-            
-            // Timed Event Blocks
-            ForEach(timedEvents, id: \.eventIdentifier) { event in
-                let startMinutes = getMinutesSinceMidnight(event.startDate)
-                let durationMinutes = max(20, Calendar.current.dateComponents([.minute], from: event.startDate, to: event.endDate).minute ?? 30)
-                
-                let yOffset = CGFloat(startMinutes) / 60.0 * hourHeight
-                let blockHeight = max(22.0, CGFloat(durationMinutes) / 60.0 * hourHeight - 2)
-                let calColor = Color(nsColor: NSColor(cgColor: event.calendar.cgColor) ?? .systemBlue)
-                
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(event.title ?? "名称未設定")
-                        .font(.system(size: 10.5, weight: .bold))
-                        .foregroundColor(.white)
-                        .lineLimit(1)
+                // Current Time Line (Red Now Line with Glowing indicator)
+                if isToday {
+                    let minutesSinceMidnight = getMinutesSinceMidnight(currentTime)
+                    let yOffset = CGFloat(minutesSinceMidnight) / 60.0 * hourHeight
                     
-                    if blockHeight > 26 {
-                        Text(formatTimeRange(start: event.startDate, end: event.endDate))
-                            .font(.system(size: 9, weight: .medium))
-                            .foregroundColor(.white.opacity(0.9))
-                            .lineLimit(1)
+                    HStack(spacing: 0) {
+                        Circle()
+                            .fill(Color.red)
+                            .frame(width: 7, height: 7)
+                            .shadow(color: .red.opacity(0.8), radius: 3)
+                        Rectangle()
+                            .fill(Color.red)
+                            .frame(height: 1.5)
                     }
+                    .offset(y: yOffset - 3.5)
+                    .zIndex(20)
                 }
-                .padding(.horizontal, 5)
-                .padding(.vertical, 2)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .frame(height: blockHeight, alignment: .topLeading)
-                .background(
-                    RoundedRectangle(cornerRadius: 5, style: .continuous)
-                        .fill(calColor.opacity(0.9))
-                        .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
-                )
-                .padding(.horizontal, 2)
-                .offset(y: yOffset)
-                .zIndex(10)
+                
+                // Overlap-Aware Side-by-Side Event Blocks (Apple Calendar Style)
+                ForEach(layoutEvents) { item in
+                    let totalCols = CGFloat(item.totalColumns)
+                    let hSpacing: CGFloat = 2.0
+                    let totalHSpacing = hSpacing * (totalCols - 1)
+                    let itemWidth = max(28.0, (availableWidth - 4 - totalHSpacing) / totalCols)
+                    let xOffset = 2.0 + CGFloat(item.column) * (itemWidth + hSpacing)
+                    let yOffset = CGFloat(item.startMinutes) / 60.0 * hourHeight
+                    let blockHeight = max(22.0, CGFloat(item.durationMinutes) / 60.0 * hourHeight - 2)
+                    let calColor = Color(nsColor: NSColor(cgColor: item.event.calendar.cgColor) ?? .systemBlue)
+                    
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(item.event.title ?? "名称未設定")
+                            .font(.system(size: item.totalColumns > 1 ? 9.5 : 10.5, weight: .bold))
+                            .foregroundColor(.white)
+                            .lineLimit(1)
+                        
+                        if blockHeight > 24 {
+                            Text(formatTimeRange(start: item.event.startDate, end: item.event.endDate))
+                                .font(.system(size: item.totalColumns > 1 ? 8.0 : 8.5, weight: .medium))
+                                .foregroundColor(.white.opacity(0.9))
+                                .lineLimit(1)
+                        }
+                    }
+                    .padding(.horizontal, 4.5)
+                    .padding(.vertical, 2)
+                    .frame(width: itemWidth, height: blockHeight, alignment: .topLeading)
+                    .background(
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            .fill(calColor.opacity(0.92))
+                            .shadow(color: .black.opacity(0.25), radius: 2, x: 0, y: 1)
+                    )
+                    .offset(x: xOffset, y: yOffset)
+                    .zIndex(10)
+                }
             }
         }
+        .frame(height: CGFloat(totalHours) * hourHeight)
     }
     
     private func getMinutesSinceMidnight(_ d: Date) -> Int {
@@ -499,5 +512,82 @@ struct DayTimelineColumn: View {
         formatter.locale = Locale(identifier: "ja_JP")
         formatter.dateFormat = is24HourFormat ? "H:mm" : "h:mm a"
         return "\(formatter.string(from: start))-\(formatter.string(from: end))"
+    }
+    
+    // Apple Calendar Overlap Layout Algorithm (Multi-Column Clustering)
+    private func computeEventLayout(_ events: [EKEvent]) -> [LayoutEvent] {
+        let sorted = events.sorted { e1, e2 in
+            if e1.startDate == e2.startDate {
+                return e1.endDate > e2.endDate
+            }
+            return e1.startDate < e2.startDate
+        }
+        
+        guard !sorted.isEmpty else { return [] }
+        
+        // 1. Group into overlapping clusters
+        var clusters: [[EKEvent]] = []
+        var currentCluster: [EKEvent] = []
+        var clusterEnd: Date? = nil
+        
+        for event in sorted {
+            if let end = clusterEnd, event.startDate < end {
+                currentCluster.append(event)
+                if event.endDate > end {
+                    clusterEnd = event.endDate
+                }
+            } else {
+                if !currentCluster.isEmpty {
+                    clusters.append(currentCluster)
+                }
+                currentCluster = [event]
+                clusterEnd = event.endDate
+            }
+        }
+        if !currentCluster.isEmpty {
+            clusters.append(currentCluster)
+        }
+        
+        // 2. For each cluster, greedily assign columns
+        var result: [LayoutEvent] = []
+        
+        for cluster in clusters {
+            var columnEndTimes: [Date] = []
+            var clusterAssignments: [(event: EKEvent, col: Int)] = []
+            
+            for event in cluster {
+                var placed = false
+                for (colIdx, end) in columnEndTimes.enumerated() {
+                    if event.startDate >= end {
+                        columnEndTimes[colIdx] = event.endDate
+                        clusterAssignments.append((event, colIdx))
+                        placed = true
+                        break
+                    }
+                }
+                if !placed {
+                    let newCol = columnEndTimes.count
+                    columnEndTimes.append(event.endDate)
+                    clusterAssignments.append((event, newCol))
+                }
+            }
+            
+            let totalCols = max(1, columnEndTimes.count)
+            for item in clusterAssignments {
+                let startMinutes = getMinutesSinceMidnight(item.event.startDate)
+                let durationMinutes = max(15, Calendar.current.dateComponents([.minute], from: item.event.startDate, to: item.event.endDate).minute ?? 30)
+                
+                result.append(LayoutEvent(
+                    id: item.event.eventIdentifier ?? UUID().uuidString,
+                    event: item.event,
+                    startMinutes: startMinutes,
+                    durationMinutes: durationMinutes,
+                    column: item.col,
+                    totalColumns: totalCols
+                ))
+            }
+        }
+        
+        return result
     }
 }
