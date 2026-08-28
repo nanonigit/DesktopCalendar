@@ -21,51 +21,15 @@ struct MonthCalendarView: View {
     
     var body: some View {
         VStack(spacing: 8) {
-            // Header
+            // Header (Ultra-clean title + location without buttons)
             VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 4) {
+                HStack {
                     Text(monthYearFormatter.string(from: settings.currentMonthDate))
                         .font(.system(size: 16, weight: .bold, design: .rounded))
                         .foregroundColor(.primary)
                         .lineLimit(1)
                     
-                    Spacer(minLength: 2)
-                    
-                    Button(action: {
-                        withAnimation {
-                            settings.currentMonthDate = Date()
-                            settings.selectedDate = Date()
-                            calendarManager.fetchData(for: settings.currentMonthDate)
-                        }
-                    }) {
-                        Text("今日")
-                            .font(.system(size: 10, weight: .semibold))
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 3)
-                            .background(Color.white.opacity(0.12))
-                            .cornerRadius(5)
-                    }
-                    .buttonStyle(.plain)
-                    
-                    HStack(spacing: 2) {
-                        Button(action: { changeMonth(by: -1) }) {
-                            Image(systemName: "chevron.left")
-                                .font(.system(size: 10, weight: .bold))
-                                .padding(5)
-                                .background(Color.white.opacity(0.08))
-                                .clipShape(Circle())
-                        }
-                        .buttonStyle(.plain)
-                        
-                        Button(action: { changeMonth(by: 1) }) {
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 10, weight: .bold))
-                                .padding(5)
-                                .background(Color.white.opacity(0.08))
-                                .clipShape(Circle())
-                        }
-                        .buttonStyle(.plain)
-                    }
+                    Spacer()
                 }
                 
                 // Recognized Location & Timezone Indicator
@@ -122,15 +86,6 @@ struct MonthCalendarView: View {
                             .frame(height: 32)
                     }
                 }
-            }
-        }
-    }
-    
-    private func changeMonth(by value: Int) {
-        if let newDate = calendar.date(byAdding: .month, value: value, to: settings.currentMonthDate) {
-            withAnimation {
-                settings.currentMonthDate = newDate
-                calendarManager.fetchData(for: newDate)
             }
         }
     }
