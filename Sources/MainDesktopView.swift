@@ -26,7 +26,7 @@ struct MainDesktopView: View {
     @State private var dragInitialWidth: Double? = nil
     
     var body: some View {
-        ZStack {
+        ZStack(alignment: .bottomTrailing) {
             // Widget Style Dark Background
             Color.black.opacity(settings.backgroundOpacity)
                 .background(VisualEffectView(material: .hudWindow, blendingMode: .behindWindow))
@@ -66,11 +66,16 @@ struct MainDesktopView: View {
                         .padding(.trailing, 8)
                     }
                     
-                    // Invisible Drag Split Handle between Left & Right panels
+                    // Drag Split Handle between Left & Right panels
                     if (settings.showMonthCalendar || settings.showReminders) && settings.showAgenda {
                         Rectangle()
-                            .fill(Color.white.opacity(0.001))
-                            .frame(width: 12)
+                            .fill(Color.white.opacity(settings.isFrontmostMode ? 0.15 : 0.001))
+                            .frame(width: 10)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 2)
+                                    .fill(Color.white.opacity(settings.isFrontmostMode ? 0.35 : 0))
+                                    .frame(width: 3, height: 32)
+                            )
                             .contentShape(Rectangle())
                             .gesture(
                                 DragGesture()
@@ -97,6 +102,14 @@ struct MainDesktopView: View {
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 12)
+            }
+            
+            // Resize indicator in Frontmost Mode
+            if settings.isFrontmostMode {
+                Image(systemName: "arrow.up.left.and.down.right.and.arrow.up.right.and.down.left")
+                    .font(.system(size: 9))
+                    .foregroundColor(.white.opacity(0.4))
+                    .padding(8)
             }
         }
     }

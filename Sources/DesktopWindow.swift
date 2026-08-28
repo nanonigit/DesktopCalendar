@@ -10,7 +10,7 @@ class DesktopWindow: NSWindow {
     init(contentRect: NSRect) {
         super.init(
             contentRect: contentRect,
-            styleMask: [.borderless],
+            styleMask: [.borderless, .resizable],
             backing: .buffered,
             defer: false
         )
@@ -22,6 +22,7 @@ class DesktopWindow: NSWindow {
         self.ignoresMouseEvents = false
         self.acceptsMouseMovedEvents = true
         self.minSize = NSSize(width: 300, height: 250)
+        self.maxSize = NSSize(width: 10000, height: 10000)
         self.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
         
         NotificationCenter.default.addObserver(
@@ -89,7 +90,6 @@ class DesktopWindow: NSWindow {
     
     func bringToFrontForInteraction() {
         self.level = .floating
-        self.styleMask.insert(.resizable)
         self.isMovableByWindowBackground = true
         self.isFrontmostMode = true
         AppSettings.shared.isFrontmostMode = true
@@ -99,7 +99,6 @@ class DesktopWindow: NSWindow {
     func sendToDesktopLayer() {
         // Just above desktop icons so it receives clicks/scrolls, but stays BEHIND all normal apps (.normal = 0)
         self.level = NSWindow.Level(Int(CGWindowLevelForKey(.desktopIconWindow)) + 1)
-        self.styleMask.remove(.resizable)
         self.isMovableByWindowBackground = false
         self.isFrontmostMode = false
         AppSettings.shared.isFrontmostMode = false
