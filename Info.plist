@@ -24,5 +24,9 @@
     <string>カレンダーの予定をデスクトップ上に表示するためにアクセス権が必要です。</string>
     <key>NSRemindersFullAccessUsageDescription</key>
     <string>リマインダー・ToDoタスクをデスクトップ上に表示するためにアクセス権が必要です。</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>現在地の正確な天気予報を表示するために位置情報を使用します。</string>
+    <key>NSLocationUsageDescription</key>
+    <string>現在地の正確な天気予報を表示するために位置情報を使用します。</string>
 </dict>
 </plist>

@@ -18,6 +18,7 @@ swiftc -O \
     -framework SwiftUI \
     -framework AppKit \
     -framework EventKit \
+    -framework CoreLocation \
     -framework Combine \
     -framework ServiceManagement \
     "$DIR"/Sources/*.swift \

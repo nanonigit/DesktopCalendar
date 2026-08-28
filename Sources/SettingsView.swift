@@ -7,6 +7,8 @@ struct SettingsView: View {
     @ObservedObject var weatherManager: WeatherManager = WeatherManager.shared
     @Environment(\.presentationMode) var presentationMode
     
+    @State private var citySearchQuery: String = ""
+    
     // Group calendars by source account
     private var groupedCalendars: [(source: String, calendars: [EKCalendar])] {
         let dict = Dictionary(grouping: calendarManager.availableCalendars, by: { $0.source.title })
@@ -50,9 +52,81 @@ struct SettingsView: View {
                         Text("📍 現在地とお天気")
                             .font(.headline)
                         
-                        VStack(spacing: 8) {
+                        VStack(alignment: .leading, spacing: 10) {
+                            // Location Mode Picker
+                            Picker("位置情報の取得方法", selection: Binding(
+                                get: { settings.locationMode },
+                                set: { mode in
+                                    settings.locationMode = mode
+                                    weatherManager.fetchWeather()
+                                }
+                            )) {
+                                Text("📍 自動検出（GPS / Wi-Fi）").tag("auto")
+                                Text("🔍 都市を手動設定").tag("manual")
+                            }
+                            .pickerStyle(.segmented)
+                            
+                            if settings.locationMode == "manual" {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    HStack {
+                                        Image(systemName: "magnifyingglass")
+                                            .foregroundColor(.secondary)
+                                        TextField("都市名を入力（例: 八戸、新宿、バンコク、London）", text: $citySearchQuery)
+                                            .textFieldStyle(.roundedBorder)
+                                            .onSubmit {
+                                                weatherManager.searchCities(query: citySearchQuery)
+                                            }
+                                        
+                                        Button("検索") {
+                                            weatherManager.searchCities(query: citySearchQuery)
+                                        }
+                                    }
+                                    
+                                    if weatherManager.isSearching {
+                                        Text("都市を検索中...")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    
+                                    // Search Results List
+                                    if !weatherManager.searchResults.isEmpty {
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text("検索結果（クリックして選択）:")
+                                                .font(.caption.bold())
+                                                .foregroundColor(.secondary)
+                                            
+                                            ForEach(weatherManager.searchResults) { city in
+                                                Button(action: {
+                                                    weatherManager.selectCity(city)
+                                                    citySearchQuery = ""
+                                                }) {
+                                                    HStack {
+                                                        Image(systemName: "mappin.and.ellipse")
+                                                            .font(.system(size: 11))
+                                                            .foregroundColor(.accentColor)
+                                                        Text(city.displayName)
+                                                            .font(.system(size: 12))
+                                                        Spacer()
+                                                        Text("設定する")
+                                                            .font(.caption)
+                                                            .foregroundColor(.accentColor)
+                                                    }
+                                                    .padding(.horizontal, 8)
+                                                    .padding(.vertical, 5)
+                                                    .background(Color.white.opacity(0.08))
+                                                    .cornerRadius(6)
+                                                }
+                                                .buttonStyle(.plain)
+                                            }
+                                        }
+                                        .padding(.vertical, 4)
+                                    }
+                                }
+                            }
+                            
+                            // Current Active Location
                             HStack {
-                                Text("認識中の現在地:")
+                                Text("適用中の地域:")
                                     .font(.subheadline)
                                     .foregroundColor(.secondary)
                                 
@@ -62,6 +136,7 @@ struct SettingsView: View {
                                     .font(.subheadline.weight(.semibold))
                                     .foregroundColor(.accentColor)
                             }
+                            .padding(.top, 2)
                             
                             HStack {
                                 Spacer()
@@ -378,7 +453,7 @@ struct SettingsView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .padding(20)
-        .frame(width: 520, height: 700)
+        .frame(width: 520, height: 720)
         .background(VisualEffectView(material: .hudWindow, blendingMode: .behindWindow))
         .onAppear {
             calendarManager.fetchCalendarsList()

@@ -49,6 +49,14 @@ class AppSettings: ObservableObject {
     
     @AppStorage("timelineDaysCount") var timelineDaysCount: Int = 1 // 1, 2, or 3 days
     
+    // Location Settings
+    @AppStorage("locationMode") var locationMode: String = "auto" // "auto" or "manual"
+    @AppStorage("manualCityName") var manualCityName: String = ""
+    @AppStorage("manualCountryName") var manualCountryName: String = ""
+    @AppStorage("manualLatitude") var manualLatitude: Double = 0.0
+    @AppStorage("manualLongitude") var manualLongitude: Double = 0.0
+    @AppStorage("manualTimezone") var manualTimezone: String = ""
+    
     @AppStorage("showMenuBarExtra") var showMenuBarExtra: Bool = true {
         didSet {
             NotificationCenter.default.post(name: Notification.Name("MenuBarVisibilityChanged"), object: nil)

@@ -1,6 +1,26 @@
 import Foundation
 import SwiftUI
 import Combine
+import CoreLocation
+
+struct GeocodingCityResult: Identifiable, Hashable {
+    let id: Int
+    let name: String
+    let admin1: String? // Prefecture / State
+    let country: String
+    let latitude: Double
+    let longitude: Double
+    let timezone: String
+    
+    var displayName: String {
+        var parts: [String] = [name]
+        if let admin = admin1, !admin.isEmpty, admin != name {
+            parts.append(admin)
+        }
+        parts.append(country)
+        return parts.joined(separator: ", ")
+    }
+}
 
 struct DayWeather: Identifiable {
     let id = UUID()
@@ -56,7 +76,7 @@ struct DayWeather: Identifiable {
     }
 }
 
-class WeatherManager: ObservableObject {
+class WeatherManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     static let shared = WeatherManager()
     
     @Published var dailyForecasts: [String: DayWeather] = [:]
@@ -65,15 +85,120 @@ class WeatherManager: ObservableObject {
     @Published var fullLocationLabel: String = ""
     @Published var isRefreshing: Bool = false
     
-    init() {
+    @Published var searchResults: [GeocodingCityResult] = []
+    @Published var isSearching: Bool = false
+    
+    private var locationManager: CLLocationManager?
+    private let geocoder = CLGeocoder()
+    
+    override init() {
+        super.init()
+        setupLocationManager()
         fetchWeather()
     }
     
+    private func setupLocationManager() {
+        let lm = CLLocationManager()
+        lm.delegate = self
+        lm.desiredAccuracy = kCLLocationAccuracyKilometer
+        self.locationManager = lm
+    }
+    
     func fetchWeather() {
+        let settings = AppSettings.shared
+        
         DispatchQueue.main.async {
             self.isRefreshing = true
         }
         
+        // Mode 1: Manual City Specified
+        if settings.locationMode == "manual" && !settings.manualCityName.isEmpty && settings.manualLatitude != 0 {
+            let tz = settings.manualTimezone.isEmpty ? TimeZone.current.identifier : settings.manualTimezone
+            let currentTz = TimeZone(identifier: tz) ?? TimeZone.current
+            let gmtOffsetHours = currentTz.secondsFromGMT() / 3600
+            let gmtString = gmtOffsetHours >= 0 ? "GMT+\(gmtOffsetHours)" : "GMT\(gmtOffsetHours)"
+            
+            let label = "\(settings.manualCityName) (\(gmtString))"
+            
+            DispatchQueue.main.async {
+                self.locationName = settings.manualCityName
+                self.timezoneInfo = gmtString
+                self.fullLocationLabel = label
+            }
+            
+            fetchForecast(lat: settings.manualLatitude, lon: settings.manualLongitude, timezone: tz)
+            return
+        }
+        
+        // Mode 2: Auto Detect (CoreLocation -> IP Fallback)
+        if let lm = locationManager {
+            let status = lm.authorizationStatus
+            if status == .notDetermined {
+                lm.requestAlwaysAuthorization()
+                lm.requestLocation()
+            } else if status == .authorizedAlways {
+                lm.requestLocation()
+                return
+            }
+        }
+        
+        // Fallback to IP Geolocation
+        fetchViaIP()
+    }
+    
+    // CoreLocation Delegate
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard let location = locations.last else {
+            fetchViaIP()
+            return
+        }
+        
+        let lat = location.coordinate.latitude
+        let lon = location.coordinate.longitude
+        let currentTz = TimeZone.current
+        let gmtOffsetHours = currentTz.secondsFromGMT() / 3600
+        let gmtString = gmtOffsetHours >= 0 ? "GMT+\(gmtOffsetHours)" : "GMT\(gmtOffsetHours)"
+        
+        geocoder.reverseGeocodeLocation(location, preferredLocale: Locale(identifier: "ja_JP")) { [weak self] placemarks, _ in
+            var name = ""
+            if let place = placemarks?.first {
+                if let locality = place.locality {
+                    name = locality
+                    if let admin = place.administrativeArea, admin != locality {
+                        name = "\(locality), \(admin)"
+                    }
+                } else if let nameStr = place.name {
+                    name = nameStr
+                }
+            }
+            
+            if name.isEmpty {
+                name = "現在地"
+            }
+            
+            let label = "\(name) (\(gmtString))"
+            DispatchQueue.main.async {
+                self?.locationName = name
+                self?.timezoneInfo = gmtString
+                self?.fullLocationLabel = label
+            }
+            
+            self?.fetchForecast(lat: lat, lon: lon, timezone: currentTz.identifier)
+        }
+    }
+    
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        print("CoreLocation failed: \(error), falling back to IP")
+        fetchViaIP()
+    }
+    
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        if manager.authorizationStatus == .authorizedAlways {
+            manager.requestLocation()
+        }
+    }
+    
+    private func fetchViaIP() {
         guard let url = URL(string: "http://ip-api.com/json/") else {
             DispatchQueue.main.async { self.isRefreshing = false }
             return
@@ -171,6 +296,73 @@ class WeatherManager: ObservableObject {
                 self?.dailyForecasts = dict
             }
         }.resume()
+    }
+    
+    // City Search (Open-Meteo Geocoding)
+    func searchCities(query: String) {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            DispatchQueue.main.async { self.searchResults = [] }
+            return
+        }
+        
+        guard let encoded = trimmed.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let url = URL(string: "https://geocoding-api.open-meteo.com/v1/search?name=\(encoded)&count=6&language=ja") else {
+            return
+        }
+        
+        DispatchQueue.main.async { self.isSearching = true }
+        
+        URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in
+            defer {
+                DispatchQueue.main.async { self?.isSearching = false }
+            }
+            
+            guard let data = data,
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let results = json["results"] as? [[String: Any]] else {
+                DispatchQueue.main.async { self?.searchResults = [] }
+                return
+            }
+            
+            var list: [GeocodingCityResult] = []
+            for item in results {
+                guard let id = item["id"] as? Int,
+                      let name = item["name"] as? String,
+                      let lat = item["latitude"] as? Double,
+                      let lon = item["longitude"] as? Double,
+                      let country = item["country"] as? String,
+                      let tz = item["timezone"] as? String else { continue }
+                
+                let admin1 = item["admin1"] as? String
+                list.append(GeocodingCityResult(
+                    id: id,
+                    name: name,
+                    admin1: admin1,
+                    country: country,
+                    latitude: lat,
+                    longitude: lon,
+                    timezone: tz
+                ))
+            }
+            
+            DispatchQueue.main.async {
+                self?.searchResults = list
+            }
+        }.resume()
+    }
+    
+    func selectCity(_ city: GeocodingCityResult) {
+        let settings = AppSettings.shared
+        settings.locationMode = "manual"
+        settings.manualCityName = city.displayName
+        settings.manualCountryName = city.country
+        settings.manualLatitude = city.latitude
+        settings.manualLongitude = city.longitude
+        settings.manualTimezone = city.timezone
+        
+        self.searchResults = []
+        fetchWeather()
     }
     
     func forecast(for date: Date) -> DayWeather? {
