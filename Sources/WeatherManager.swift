@@ -59,18 +59,25 @@ struct DayWeather: Identifiable {
 class WeatherManager: ObservableObject {
     static let shared = WeatherManager()
     
-    @Published var dailyForecasts: [String: DayWeather] = [:] // Key: "yyyy-MM-dd"
+    @Published var dailyForecasts: [String: DayWeather] = [:]
     @Published var locationName: String = "検出中..."
     @Published var timezoneInfo: String = ""
     @Published var fullLocationLabel: String = ""
+    @Published var isRefreshing: Bool = false
     
     init() {
         fetchWeather()
     }
     
     func fetchWeather() {
-        // Fetch location first
-        guard let url = URL(string: "http://ip-api.com/json/") else { return }
+        DispatchQueue.main.async {
+            self.isRefreshing = true
+        }
+        
+        guard let url = URL(string: "http://ip-api.com/json/") else {
+            DispatchQueue.main.async { self.isRefreshing = false }
+            return
+        }
         
         URLSession.shared.dataTask(with: url) { [weak self] data, _, error in
             var lat = 35.6895
@@ -97,7 +104,6 @@ class WeatherManager: ObservableObject {
                 }
             }
             
-            // Format location text
             let currentTz = TimeZone(identifier: tz) ?? TimeZone.current
             let gmtOffsetHours = currentTz.secondsFromGMT() / 3600
             let gmtString = gmtOffsetHours >= 0 ? "GMT+\(gmtOffsetHours)" : "GMT\(gmtOffsetHours)"
@@ -127,9 +133,18 @@ class WeatherManager: ObservableObject {
         let tzEncoded = timezone.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "Asia/Tokyo"
         let urlStr = "https://api.open-meteo.com/v1/forecast?latitude=\(lat)&longitude=\(lon)&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=\(tzEncoded)"
         
-        guard let url = URL(string: urlStr) else { return }
+        guard let url = URL(string: urlStr) else {
+            DispatchQueue.main.async { self.isRefreshing = false }
+            return
+        }
         
         URLSession.shared.dataTask(with: url) { [weak self] data, _, error in
+            defer {
+                DispatchQueue.main.async {
+                    self?.isRefreshing = false
+                }
+            }
+            
             guard let data = data,
                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let daily = json["daily"] as? [String: Any],

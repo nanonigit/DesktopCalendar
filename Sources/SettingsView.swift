@@ -28,109 +28,64 @@ struct SettingsView: View {
             
             ScrollView(.vertical, showsIndicators: true) {
                 VStack(alignment: .leading, spacing: 18) {
-                    // Section 1: Calendars Selection
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("表示するカレンダーの選択")
+                    
+                    // Section 1: Location & Weather
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("📍 現在地とお天気")
                             .font(.headline)
                         
-                        if calendarManager.availableCalendars.isEmpty {
-                            Text("利用可能なカレンダーがありません")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                        } else {
-                            VStack(spacing: 5) {
-                                ForEach(calendarManager.availableCalendars, id: \.calendarIdentifier) { cal in
-                                    let isEnabled = settings.isCalendarEnabled(cal.calendarIdentifier)
-                                    HStack(spacing: 8) {
-                                        Circle()
-                                            .fill(Color(nsColor: NSColor(cgColor: cal.cgColor) ?? .systemBlue))
-                                            .frame(width: 10, height: 10)
-                                        
-                                        Text(cal.title)
-                                            .font(.system(size: 13))
-                                        
-                                        Spacer()
-                                        
-                                        Toggle("", isOn: Binding(
-                                            get: { isEnabled },
-                                            set: { _ in
-                                                settings.toggleCalendar(cal.calendarIdentifier)
-                                                calendarManager.fetchData(for: settings.currentMonthDate)
-                                            }
-                                        ))
-                                        .toggleStyle(.checkbox)
-                                    }
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 5)
-                                    .background(Color.white.opacity(0.06))
-                                    .cornerRadius(6)
-                                }
-                            }
-                        }
-                    }
-                    
-                    Divider()
-                    
-                    // Section 2: Reminder Lists Selection
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("表示するリマインダーリストの選択")
-                            .font(.headline)
-                        
-                        if calendarManager.availableReminderLists.isEmpty {
-                            Text("利用可能なリマインダーリストがありません")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                        } else {
-                            VStack(spacing: 5) {
-                                ForEach(calendarManager.availableReminderLists, id: \.calendarIdentifier) { list in
-                                    let isEnabled = settings.isReminderListEnabled(list.calendarIdentifier)
-                                    HStack(spacing: 8) {
-                                        Circle()
-                                            .fill(Color(nsColor: NSColor(cgColor: list.cgColor) ?? .systemBlue))
-                                            .frame(width: 10, height: 10)
-                                        
-                                        Text(list.title)
-                                            .font(.system(size: 13))
-                                        
-                                        Spacer()
-                                        
-                                        Toggle("", isOn: Binding(
-                                            get: { isEnabled },
-                                            set: { _ in
-                                                settings.toggleReminderList(list.calendarIdentifier)
-                                                calendarManager.fetchData(for: settings.currentMonthDate)
-                                            }
-                                        ))
-                                        .toggleStyle(.checkbox)
-                                    }
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 5)
-                                    .background(Color.white.opacity(0.06))
-                                    .cornerRadius(6)
-                                }
-                            }
-                        }
-                    }
-                    
-                    Divider()
-                    
-                    // Section 3: Timeline, Weather & Location Settings
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("タイムラインと天気・現在地設定")
-                            .font(.headline)
-                        
-                        if !weatherManager.fullLocationLabel.isEmpty {
+                        VStack(spacing: 8) {
                             HStack {
-                                Text("認識中の都市/タイムゾーン:")
+                                Text("認識中の現在地:")
                                     .font(.subheadline)
                                     .foregroundColor(.secondary)
+                                
                                 Spacer()
-                                Text("📍 " + weatherManager.fullLocationLabel)
-                                    .font(.subheadline.bold())
+                                
+                                Text(weatherManager.fullLocationLabel.isEmpty ? "検出中..." : "📍 " + weatherManager.fullLocationLabel)
+                                    .font(.subheadline.weight(.semibold))
                                     .foregroundColor(.accentColor)
                             }
-                            .padding(.vertical, 2)
+                            
+                            HStack {
+                                Spacer()
+                                
+                                Button(action: {
+                                    weatherManager.fetchWeather()
+                                }) {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: weatherManager.isRefreshing ? "arrow.triangle.2.circlepath" : "location.circle")
+                                            .rotationEffect(.degrees(weatherManager.isRefreshing ? 360 : 0))
+                                            .animation(weatherManager.isRefreshing ? Animation.linear(duration: 1).repeatForever(autoreverses: false) : .default, value: weatherManager.isRefreshing)
+                                        Text(weatherManager.isRefreshing ? "現在地を取得中..." : "現在地と天気を今すぐ更新")
+                                            .font(.system(size: 12, weight: .medium))
+                                    }
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 5)
+                                    .background(Color.white.opacity(0.1))
+                                    .cornerRadius(6)
+                                }
+                                .buttonStyle(.plain)
+                                .disabled(weatherManager.isRefreshing)
+                            }
                         }
+                        .padding(10)
+                        .background(Color.white.opacity(0.04))
+                        .cornerRadius(8)
+                        
+                        Toggle("タイムラインに天気予報を表示する", isOn: $settings.showWeather)
+                    }
+                    
+                    Divider()
+                    
+                    // Section 2: Panels Layout & Display
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("📊 パネルレイアウトと表示")
+                            .font(.headline)
+                        
+                        Toggle("月間カレンダーを表示", isOn: $settings.showMonthCalendar)
+                        Toggle("右側のタイムラインを表示", isOn: $settings.showAgenda)
+                        Toggle("リマインダー / ToDo を表示", isOn: $settings.showReminders)
                         
                         Picker("タイムラインの表示日数", selection: $settings.timelineDaysCount) {
                             Text("1日分").tag(1)
@@ -138,10 +93,26 @@ struct SettingsView: View {
                             Text("3日分").tag(3)
                         }
                         .pickerStyle(.segmented)
+                        .padding(.vertical, 2)
                         
-                        Toggle("タイムラインに天気予報を表示する", isOn: $settings.showWeather)
+                        HStack {
+                            Text("左パネル（カレンダー・ToDo）の幅")
+                            Spacer()
+                            Slider(value: $settings.leftPanelWidth, in: 140...450, step: 5)
+                                .frame(width: 160)
+                            Text("\(Int(settings.leftPanelWidth))px")
+                                .frame(width: 44, alignment: .trailing)
+                        }
+                    }
+                    
+                    Divider()
+                    
+                    // Section 3: Reminders Settings
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("✅ リマインダー / ToDo 設定")
+                            .font(.headline)
                         
-                        Picker("リマインダーの表示期限", selection: $settings.reminderDateRange) {
+                        Picker("表示する期限範囲", selection: $settings.reminderDateRange) {
                             ForEach(ReminderDateRange.allCases) { range in
                                 Text(range.label).tag(range)
                             }
@@ -152,30 +123,9 @@ struct SettingsView: View {
                     
                     Divider()
                     
-                    // Section 4: Layout & Panel Sizes
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("パネルレイアウトとサイズ")
-                            .font(.headline)
-                        
-                        HStack {
-                            Text("左パネル（カレンダー・ToDo）の幅")
-                            Spacer()
-                            Slider(value: $settings.leftPanelWidth, in: 140...450, step: 5)
-                                .frame(width: 160)
-                            Text("\(Int(settings.leftPanelWidth))px")
-                                .frame(width: 44, alignment: .trailing)
-                        }
-                        
-                        Toggle("月間カレンダーを表示", isOn: $settings.showMonthCalendar)
-                        Toggle("右側のタイムラインを表示", isOn: $settings.showAgenda)
-                        Toggle("リマインダー / ToDo を表示", isOn: $settings.showReminders)
-                    }
-                    
-                    Divider()
-                    
-                    // Section 5: Calendar Format & Appearance
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("外観と表記")
+                    // Section 4: Appearance & Format
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("🎨 外観と日時表記")
                             .font(.headline)
                         
                         HStack {
@@ -198,9 +148,101 @@ struct SettingsView: View {
                     
                     Divider()
                     
+                    // Section 5: Calendar & Reminder Lists Filtering
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("🗓 表示するカレンダー・リストの選択")
+                            .font(.headline)
+                        
+                        // Calendars
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("カレンダーアカウント")
+                                .font(.subheadline.bold())
+                                .foregroundColor(.secondary)
+                            
+                            if calendarManager.availableCalendars.isEmpty {
+                                Text("利用可能なカレンダーがありません")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            } else {
+                                VStack(spacing: 4) {
+                                    ForEach(calendarManager.availableCalendars, id: \.calendarIdentifier) { cal in
+                                        let isEnabled = settings.isCalendarEnabled(cal.calendarIdentifier)
+                                        HStack(spacing: 8) {
+                                            Circle()
+                                                .fill(Color(nsColor: NSColor(cgColor: cal.cgColor) ?? .systemBlue))
+                                                .frame(width: 9, height: 9)
+                                            
+                                            Text(cal.title)
+                                                .font(.system(size: 12.5))
+                                            
+                                            Spacer()
+                                            
+                                            Toggle("", isOn: Binding(
+                                                get: { isEnabled },
+                                                set: { _ in
+                                                    settings.toggleCalendar(cal.calendarIdentifier)
+                                                    calendarManager.fetchData(for: settings.currentMonthDate)
+                                                }
+                                            ))
+                                            .toggleStyle(.checkbox)
+                                        }
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(Color.white.opacity(0.04))
+                                        .cornerRadius(5)
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Reminders Lists
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("リマインダーリスト")
+                                .font(.subheadline.bold())
+                                .foregroundColor(.secondary)
+                            
+                            if calendarManager.availableReminderLists.isEmpty {
+                                Text("利用可能なリマインダーリストがありません")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            } else {
+                                VStack(spacing: 4) {
+                                    ForEach(calendarManager.availableReminderLists, id: \.calendarIdentifier) { list in
+                                        let isEnabled = settings.isReminderListEnabled(list.calendarIdentifier)
+                                        HStack(spacing: 8) {
+                                            Circle()
+                                                .fill(Color(nsColor: NSColor(cgColor: list.cgColor) ?? .systemBlue))
+                                                .frame(width: 9, height: 9)
+                                            
+                                            Text(list.title)
+                                                .font(.system(size: 12.5))
+                                            
+                                            Spacer()
+                                            
+                                            Toggle("", isOn: Binding(
+                                                get: { isEnabled },
+                                                set: { _ in
+                                                    settings.toggleReminderList(list.calendarIdentifier)
+                                                    calendarManager.fetchData(for: settings.currentMonthDate)
+                                                }
+                                            ))
+                                            .toggleStyle(.checkbox)
+                                        }
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(Color.white.opacity(0.04))
+                                        .cornerRadius(5)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    Divider()
+                    
                     // Section 6: System
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("システム設定")
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("⚙️ システム設定")
                             .font(.headline)
                         
                         Toggle("Mac起動時に自動で起動する（ログイン項目）", isOn: Binding(
