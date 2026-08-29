@@ -112,7 +112,11 @@ struct RemindersListView: View {
                 ScrollView(.vertical, showsIndicators: true) {
                     VStack(spacing: 4) {
                         ForEach(filteredReminders, id: \.calendarItemIdentifier) { reminder in
-                            ReminderRowView(reminder: reminder, calendarManager: calendarManager)
+                            ReminderRowView(
+                                reminder: reminder,
+                                calendarManager: calendarManager,
+                                eventFontSize: settings.eventFontSize
+                            )
                         }
                     }
                     .padding(.vertical, 1)
@@ -126,6 +130,7 @@ struct RemindersListView: View {
 struct ReminderRowView: View {
     let reminder: EKReminder
     let calendarManager: CalendarManager
+    let eventFontSize: Double
     
     struct DueBadgeInfo {
         let text: String
@@ -136,7 +141,7 @@ struct ReminderRowView: View {
     var body: some View {
         HStack(spacing: 6) {
             Text(reminder.title ?? "名称未設定")
-                .font(.system(size: 11.5, weight: .medium))
+                .font(.system(size: CGFloat(eventFontSize), weight: .medium))
                 .strikethrough(reminder.isCompleted)
                 .foregroundColor(reminder.isCompleted ? .secondary.opacity(0.5) : .white)
                 .lineLimit(1)

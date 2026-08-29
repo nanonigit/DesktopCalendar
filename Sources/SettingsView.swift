@@ -237,6 +237,16 @@ struct SettingsView: View {
                             Text("\(Int(settings.leftPanelWidth))px")
                                 .frame(width: 44, alignment: .trailing)
                         }
+                        
+                        HStack {
+                            Text("予定・ToDoの文字サイズ")
+                            Spacer()
+                            Slider(value: $settings.eventFontSize, in: 8...15, step: 0.5)
+                                .frame(width: 160)
+                            Text(String(format: "%.1f pt", settings.eventFontSize))
+                                .frame(width: 44, alignment: .trailing)
+                                .font(.system(size: 11, weight: .medium, design: .monospaced))
+                        }
                     }
                     
                     Divider()

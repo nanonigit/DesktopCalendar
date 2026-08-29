@@ -64,6 +64,7 @@ class AppSettings: ObservableObject {
     @AppStorage("reminderDateRange") var reminderDateRangeRaw: String = ReminderDateRange.all.rawValue
     
     @AppStorage("timelineDaysCount") var timelineDaysCount: Int = 1 // 1, 2, or 3 days
+    @AppStorage("eventFontSize") var eventFontSize: Double = 10.5 // 8.0 to 15.0 pt
     @AppStorage("timelineDisplayMode") var timelineDisplayModeRaw: String = TimelineDisplayMode.fitDaytime.rawValue
     
     var timelineDisplayMode: TimelineDisplayMode {

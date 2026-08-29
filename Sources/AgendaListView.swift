@@ -171,7 +171,7 @@ struct AgendaListView: View {
                                     ForEach(allDayList, id: \.eventIdentifier) { event in
                                         let calColor = Color(nsColor: NSColor(cgColor: event.calendar.cgColor) ?? .systemBlue)
                                         Text(event.title ?? "終日予定")
-                                            .font(.system(size: 10, weight: .bold))
+                                            .font(.system(size: CGFloat(settings.eventFontSize), weight: .bold))
                                             .foregroundColor(.white)
                                             .lineLimit(1)
                                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -336,6 +336,7 @@ struct AgendaListView: View {
                             hourHeight: hourHeight,
                             totalHours: totalHours,
                             currentTime: currentTime,
+                            eventFontSize: settings.eventFontSize,
                             events: calendarManager.events(for: date),
                             is24HourFormat: settings.is24HourFormat,
                             showWeather: settings.showWeather,
@@ -485,6 +486,7 @@ struct DayTimelineColumn: View {
     let hourHeight: CGFloat
     let totalHours: Int
     let currentTime: Date
+    let eventFontSize: Double
     let events: [EKEvent]
     let is24HourFormat: Bool
     let showWeather: Bool
@@ -584,15 +586,19 @@ struct DayTimelineColumn: View {
                         let blockHeight = max(18.0, CGFloat(visibleDuration) / 60.0 * hourHeight - 1.5)
                         let calColor = Color(nsColor: NSColor(cgColor: item.event.calendar.cgColor) ?? .systemBlue)
                         
+                        let baseFontSize = CGFloat(eventFontSize)
+                        let titleSize = hourHeight < 24 ? max(7.5, baseFontSize - 1.5) : (item.totalColumns > 1 ? max(8.0, baseFontSize - 1.0) : baseFontSize)
+                        let subSize = max(7.0, titleSize - 2.0)
+                        
                         VStack(alignment: .leading, spacing: 0.5) {
                             Text(item.event.title ?? "名称未設定")
-                                .font(.system(size: hourHeight < 24 ? 8.5 : (item.totalColumns > 1 ? 9.5 : 10.5), weight: .bold))
+                                .font(.system(size: titleSize, weight: .bold))
                                 .foregroundColor(.white)
                                 .lineLimit(1)
                             
                             if blockHeight > 22 && hourHeight >= 22 {
                                 Text(formatTimeRange(start: item.event.startDate, end: item.event.endDate))
-                                    .font(.system(size: hourHeight < 24 ? 7.5 : (item.totalColumns > 1 ? 8.0 : 8.5), weight: .medium))
+                                    .font(.system(size: subSize, weight: .medium))
                                     .foregroundColor(.white.opacity(0.9))
                                     .lineLimit(1)
                             }
