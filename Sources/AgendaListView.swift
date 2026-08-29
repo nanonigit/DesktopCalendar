@@ -24,8 +24,23 @@ struct AgendaListView: View {
     
     private var displayedDates: [Date] {
         let calendar = Calendar.current
-        let baseDate = calendar.startOfDay(for: settings.selectedDate)
+        let today = calendar.startOfDay(for: currentTime)
         let count = max(1, min(settings.timelineDaysCount, 3))
+        
+        let baseDate: Date
+        if count > 1 {
+            // When displaying multiple days (2 or 3 days), the leftmost column is ALWAYS Today
+            // (or a future selected date if explicitly browsing upcoming future days)
+            if calendar.startOfDay(for: settings.selectedDate) > today {
+                baseDate = calendar.startOfDay(for: settings.selectedDate)
+            } else {
+                baseDate = today
+            }
+        } else {
+            // 1-day mode: show selected date
+            baseDate = calendar.startOfDay(for: settings.selectedDate)
+        }
+        
         return (0..<count).compactMap { calendar.date(byAdding: .day, value: $0, to: baseDate) }
     }
     
@@ -264,12 +279,21 @@ struct AgendaListView: View {
                     .padding(.top, 4)
                 }
                 .onAppear {
+                    if settings.timelineDaysCount > 1 && !Calendar.current.isDateInToday(settings.selectedDate) {
+                        settings.selectedDate = Date()
+                        settings.currentMonthDate = Date()
+                    }
                     withAnimation(.easeInOut(duration: 0.4)) {
                         proxy.scrollTo("hour_\(smartScrollHour)", anchor: .top)
                     }
                 }
                 .onReceive(timer) { newTime in
                     self.currentTime = newTime
+                    let cal = Calendar.current
+                    if settings.timelineDaysCount > 1 && !cal.isDate(settings.selectedDate, inSameDayAs: newTime) {
+                        settings.selectedDate = newTime
+                        settings.currentMonthDate = newTime
+                    }
                 }
             }
         }
