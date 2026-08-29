@@ -113,6 +113,23 @@ struct AgendaListView: View {
                 
                 Spacer()
                 
+                // Active Severe Weather Warning Badge (Worldwide: Typhoon, Heavy Rain, Heat, Storm)
+                if let alert = weatherManager.activeAlert {
+                    HStack(spacing: 3) {
+                        Image(systemName: alert.icon)
+                            .font(.system(size: 8.5))
+                        Text(alert.title)
+                            .font(.system(size: 10, weight: .bold))
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            .fill(alert.color.opacity(0.9))
+                    )
+                }
+                
                 // Live Current Clock Badge
                 HStack(spacing: 3) {
                     Circle()
@@ -479,6 +496,19 @@ struct AppleCalendarDayHeader: View {
                                     .foregroundColor(Color(red: 0.35, green: 0.8, blue: 1.0))
                                     .padding(.leading, 1)
                             }
+                        }
+                        
+                        if let alert = w.alert {
+                            Text(alert.title)
+                                .font(.system(size: 7.5, weight: .bold))
+                                .foregroundColor(.white)
+                                .lineLimit(1)
+                                .padding(.horizontal, 3.5)
+                                .padding(.vertical, 1)
+                                .background(
+                                    Capsule()
+                                        .fill(alert.color.opacity(0.95))
+                                )
                         }
                     }
                 }

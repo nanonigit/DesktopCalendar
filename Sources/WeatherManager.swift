@@ -3,6 +3,18 @@ import SwiftUI
 import Combine
 import CoreLocation
 
+struct WeatherAlert: Identifiable, Equatable {
+    let id = UUID()
+    let title: String
+    let icon: String
+    let color: Color
+    let detail: String
+    
+    static func == (lhs: WeatherAlert, rhs: WeatherAlert) -> Bool {
+        lhs.title == rhs.title && lhs.detail == rhs.detail
+    }
+}
+
 struct GeocodingCityResult: Identifiable, Hashable {
     let id: Int
     let name: String
@@ -34,6 +46,7 @@ struct DayWeather: Identifiable {
     let maxTemp: Int
     let minTemp: Int
     let precipProbMax: Int
+    let alert: WeatherAlert?
     
     var iconName: String {
         WeatherManager.weatherIcon(for: weatherCode)
@@ -78,6 +91,7 @@ class WeatherManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     @Published var countryFlag: String = ""
     @Published var timezoneInfo: String = ""
     @Published var fullLocationLabel: String = ""
+    @Published var activeAlert: WeatherAlert? = nil
     @Published var isRefreshing: Bool = false
     
     @Published var searchResults: [GeocodingCityResult] = []
@@ -121,6 +135,7 @@ class WeatherManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         if lower.contains("韓国") || lower.contains("korea") { return "🇰🇷" }
         if lower.contains("台湾") || lower.contains("taiwan") { return "🇹🇼" }
         if lower.contains("中国") || lower.contains("china") { return "🇨🇳" }
+        if lower.contains("ミャンマー") || lower.contains("myanmar") || lower.contains("ヤンゴン") || lower.contains("yangon") { return "🇲🇲" }
         if lower.contains("フランス") || lower.contains("france") { return "🇫🇷" }
         if lower.contains("ドイツ") || lower.contains("germany") { return "🇩🇪" }
         if lower.contains("イタリア") || lower.contains("italy") { return "🇮🇹" }
@@ -130,6 +145,8 @@ class WeatherManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         if lower.contains("インドネシア") || lower.contains("indonesia") { return "🇮🇩" }
         if lower.contains("マレーシア") || lower.contains("malaysia") { return "🇲🇾" }
         if lower.contains("フィリピン") || lower.contains("philippines") { return "🇵🇭" }
+        if lower.contains("カンボジア") || lower.contains("cambodia") { return "🇰🇭" }
+        if lower.contains("ラオス") || lower.contains("laos") { return "🇱🇦" }
         if lower.contains("オランダ") || lower.contains("netherlands") { return "🇳🇱" }
         if lower.contains("スイス") || lower.contains("switzerland") { return "🇨🇭" }
         if lower.contains("スウェーデン") || lower.contains("sweden") { return "🇸🇪" }
@@ -185,6 +202,44 @@ class WeatherManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         default:
             return Color.yellow
         }
+    }
+    
+    // Worldwide Severe Weather & Alert Detection (WMO / JMA / NOAA Standards)
+    static func computeAlert(weatherCode: Int, maxTemp: Int, minTemp: Int, precipSum: Double, windGustsMax: Double) -> WeatherAlert? {
+        // 1. Typhoon / Gale / Storm Warning (windGusts in km/h: 65 km/h ≈ 18 m/s, 85 km/h ≈ 24 m/s)
+        if windGustsMax >= 85.0 {
+            return WeatherAlert(title: "暴風・台風警報", icon: "wind", color: Color(red: 1.0, green: 0.3, blue: 0.3), detail: String(format: "最大突風 %.0f km/h", windGustsMax))
+        } else if windGustsMax >= 65.0 {
+            return WeatherAlert(title: "強風・突風注意", icon: "wind", color: Color(red: 1.0, green: 0.6, blue: 0.2), detail: String(format: "最大突風 %.0f km/h", windGustsMax))
+        }
+        
+        // 2. Heavy Rain / Torrential Rain / Flood Warning
+        if precipSum >= 70.0 || weatherCode == 82 {
+            return WeatherAlert(title: "大雨・豪雨警報", icon: "exclamationmark.triangle.fill", color: Color(red: 1.0, green: 0.3, blue: 0.3), detail: String(format: "予測降水量 %.0f mm", precipSum))
+        } else if precipSum >= 40.0 || weatherCode == 65 {
+            return WeatherAlert(title: "大雨警戒", icon: "exclamationmark.triangle.fill", color: Color(red: 1.0, green: 0.6, blue: 0.2), detail: String(format: "予測降水量 %.0f mm", precipSum))
+        }
+        
+        // 3. Thunderstorm / Severe Squall (95, 96, 99)
+        if weatherCode == 96 || weatherCode == 99 {
+            return WeatherAlert(title: "激しい雷雨・雹警報", icon: "bolt.fill", color: Color(red: 1.0, green: 0.35, blue: 0.35), detail: "落雷・突風・降雹に警戒")
+        } else if weatherCode == 95 {
+            return WeatherAlert(title: "雷雨・スコール警戒", icon: "bolt.fill", color: Color(red: 1.0, green: 0.65, blue: 0.2), detail: "落雷・急な強雨に警戒")
+        }
+        
+        // 4. Extreme Heat Warning
+        if maxTemp >= 38 {
+            return WeatherAlert(title: "極度猛暑警戒", icon: "sun.max.fill", color: Color(red: 1.0, green: 0.25, blue: 0.25), detail: "熱中症に厳重警戒")
+        } else if maxTemp >= 35 {
+            return WeatherAlert(title: "猛暑警戒", icon: "sun.max.fill", color: Color(red: 1.0, green: 0.55, blue: 0.2), detail: "熱中症に警戒")
+        }
+        
+        // 5. Heavy Snow / Blizzard
+        if weatherCode == 86 || weatherCode == 75 {
+            return WeatherAlert(title: "大雪・吹雪警報", icon: "snowflake", color: Color(red: 0.4, green: 0.8, blue: 1.0), detail: "積雪・吹雪に警戒")
+        }
+        
+        return nil
     }
     
     private func setupLocationManager() {
@@ -363,7 +418,7 @@ class WeatherManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     
     private func fetchForecast(lat: Double, lon: Double, timezone: String) {
         let tzEncoded = timezone.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "Asia/Tokyo"
-        let urlStr = "https://api.open-meteo.com/v1/forecast?latitude=\(lat)&longitude=\(lon)&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_probability_max&hourly=weathercode,temperature_2m,precipitation_probability&timezone=\(tzEncoded)"
+        let urlStr = "https://api.open-meteo.com/v1/forecast?latitude=\(lat)&longitude=\(lon)&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,windgusts_10m_max,windspeed_10m_max&hourly=weathercode,temperature_2m,precipitation_probability,windgusts_10m&timezone=\(tzEncoded)"
         
         guard let url = URL(string: urlStr) else {
             DispatchQueue.main.async { self.isRefreshing = false }
@@ -391,17 +446,32 @@ class WeatherManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                let minTemps = daily["temperature_2m_min"] as? [Double] {
                 
                 let precipMaxList = daily["precipitation_probability_max"] as? [Int] ?? []
+                let precipSumList = daily["precipitation_sum"] as? [Double] ?? []
+                let windGustsList = daily["windgusts_10m_max"] as? [Double] ?? []
                 
                 for i in 0..<times.count {
                     guard i < codes.count, i < maxTemps.count, i < minTemps.count else { break }
                     let pMax = i < precipMaxList.count ? precipMaxList[i] : 0
+                    let pSum = i < precipSumList.count ? precipSumList[i] : 0.0
+                    let wGust = i < windGustsList.count ? windGustsList[i] : 0.0
+                    let mxT = Int(round(maxTemps[i]))
+                    let mnT = Int(round(minTemps[i]))
+                    
+                    let alert = WeatherManager.computeAlert(
+                        weatherCode: codes[i],
+                        maxTemp: mxT,
+                        minTemp: mnT,
+                        precipSum: pSum,
+                        windGustsMax: wGust
+                    )
                     
                     let item = DayWeather(
                         dateString: times[i],
                         weatherCode: codes[i],
-                        maxTemp: Int(round(maxTemps[i])),
-                        minTemp: Int(round(minTemps[i])),
-                        precipProbMax: pMax
+                        maxTemp: mxT,
+                        minTemp: mnT,
+                        precipProbMax: pMax,
+                        alert: alert
                     )
                     dailyDict[times[i]] = item
                 }
@@ -449,24 +519,38 @@ class WeatherManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                         let actualMin = temps.min() ?? 0
                         let maxPrecip = precips.max() ?? (dailyDict[dateStr]?.precipProbMax ?? 0)
                         let existingCode = dailyDict[dateStr]?.weatherCode ?? hourMap[12]?.weatherCode ?? 0
+                        let existingAlert = dailyDict[dateStr]?.alert
                         
                         dailyDict[dateStr] = DayWeather(
                             dateString: dateStr,
                             weatherCode: existingCode,
                             maxTemp: actualMax,
                             minTemp: actualMin,
-                            precipProbMax: maxPrecip
+                            precipProbMax: maxPrecip,
+                            alert: existingAlert
                         )
                     }
                 }
                 
+                let formatter = DateFormatter()
+                formatter.dateFormat = "yyyy-MM-dd"
+                let keyToday = formatter.string(from: Date())
+                let todayAlert = dailyDict[keyToday]?.alert
+                
                 DispatchQueue.main.async {
                     self?.hourlyForecasts = hDict
                     self?.dailyForecasts = dailyDict
+                    self?.activeAlert = todayAlert
                 }
             } else {
+                let formatter = DateFormatter()
+                formatter.dateFormat = "yyyy-MM-dd"
+                let keyToday = formatter.string(from: Date())
+                let todayAlert = dailyDict[keyToday]?.alert
+                
                 DispatchQueue.main.async {
                     self?.dailyForecasts = dailyDict
+                    self?.activeAlert = todayAlert
                 }
             }
         }.resume()
