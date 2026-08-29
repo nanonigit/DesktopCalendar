@@ -92,13 +92,18 @@ struct AgendaListView: View {
         VStack(spacing: 0) {
             // 0. Location & Live Current Time Header Bar
             HStack(spacing: 4) {
-                // Location & Timezone Indicator
-                HStack(spacing: 3) {
-                    Image(systemName: "location.fill")
-                        .font(.system(size: 8.5))
-                        .foregroundColor(.accentColor)
+                // Location & Timezone Indicator with Country Flag
+                HStack(spacing: 4) {
+                    if !weatherManager.countryFlag.isEmpty {
+                        Text(weatherManager.countryFlag)
+                            .font(.system(size: 13))
+                    } else {
+                        Image(systemName: "location.fill")
+                            .font(.system(size: 8.5))
+                            .foregroundColor(.accentColor)
+                    }
                     
-                    Text(weatherManager.fullLocationLabel.isEmpty ? "現在地 (JST)" : weatherManager.fullLocationLabel)
+                    Text(weatherManager.locationName.isEmpty ? "現在地 (JST)" : "\(weatherManager.locationName) (\(weatherManager.timezoneInfo))")
                         .font(.system(size: 11, weight: .bold))
                         .foregroundColor(.primary.opacity(0.9))
                         .lineLimit(1)

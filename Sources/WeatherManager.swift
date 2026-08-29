@@ -8,9 +8,14 @@ struct GeocodingCityResult: Identifiable, Hashable {
     let name: String
     let admin1: String? // Prefecture / State
     let country: String
+    let countryCode: String?
     let latitude: Double
     let longitude: Double
     let timezone: String
+    
+    var flag: String {
+        WeatherManager.flagEmoji(for: country, code: countryCode)
+    }
     
     var displayName: String {
         var parts: [String] = [name]
@@ -60,6 +65,7 @@ class WeatherManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     @Published var dailyForecasts: [String: DayWeather] = [:]
     @Published var hourlyForecasts: [String: [Int: HourlyWeather]] = [:]
     @Published var locationName: String = "検出中..."
+    @Published var countryFlag: String = ""
     @Published var timezoneInfo: String = ""
     @Published var fullLocationLabel: String = ""
     @Published var isRefreshing: Bool = false
@@ -74,6 +80,53 @@ class WeatherManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         super.init()
         setupLocationManager()
         fetchWeather()
+    }
+    
+    // Country flag emoji converter (ISO 3166-1 alpha-2 or country name)
+    static func flagEmoji(for country: String? = nil, code: String? = nil) -> String {
+        if let code = code?.trimmingCharacters(in: .whitespacesAndNewlines).uppercased(), code.count == 2 {
+            let base: UInt32 = 127397
+            var s = ""
+            var valid = true
+            for scalar in code.unicodeScalars {
+                guard scalar.value >= 65 && scalar.value <= 90 else { valid = false; break }
+                if let flagScalar = UnicodeScalar(base + scalar.value) {
+                    s.unicodeScalars.append(flagScalar)
+                }
+            }
+            if valid && !s.isEmpty { return s }
+        }
+        
+        guard let country = country?.trimmingCharacters(in: .whitespacesAndNewlines), !country.isEmpty else {
+            return "🇯🇵"
+        }
+        
+        let lower = country.lowercased()
+        if lower.contains("日本") || lower.contains("japan") { return "🇯🇵" }
+        if lower.contains("アメリカ") || lower.contains("米国") || lower.contains("united states") || lower.contains("usa") { return "🇺🇸" }
+        if lower.contains("イギリス") || lower.contains("英国") || lower.contains("united kingdom") || lower.contains("uk") { return "🇬🇧" }
+        if lower.contains("タイ") || lower.contains("thailand") { return "🇹🇭" }
+        if lower.contains("シンガポール") || lower.contains("singapore") { return "🇸🇬" }
+        if lower.contains("ベトナム") || lower.contains("vietnam") { return "🇻🇳" }
+        if lower.contains("韓国") || lower.contains("korea") { return "🇰🇷" }
+        if lower.contains("台湾") || lower.contains("taiwan") { return "🇹🇼" }
+        if lower.contains("中国") || lower.contains("china") { return "🇨🇳" }
+        if lower.contains("フランス") || lower.contains("france") { return "🇫🇷" }
+        if lower.contains("ドイツ") || lower.contains("germany") { return "🇩🇪" }
+        if lower.contains("イタリア") || lower.contains("italy") { return "🇮🇹" }
+        if lower.contains("スペイン") || lower.contains("spain") { return "🇪🇸" }
+        if lower.contains("オーストラリア") || lower.contains("australia") { return "🇦🇺" }
+        if lower.contains("カナダ") || lower.contains("canada") { return "🇨🇦" }
+        if lower.contains("インドネシア") || lower.contains("indonesia") { return "🇮🇩" }
+        if lower.contains("マレーシア") || lower.contains("malaysia") { return "🇲🇾" }
+        if lower.contains("フィリピン") || lower.contains("philippines") { return "🇵🇭" }
+        if lower.contains("オランダ") || lower.contains("netherlands") { return "🇳🇱" }
+        if lower.contains("スイス") || lower.contains("switzerland") { return "🇨🇭" }
+        if lower.contains("スウェーデン") || lower.contains("sweden") { return "🇸🇪" }
+        if lower.contains("ニュージーランド") || lower.contains("new zealand") { return "🇳🇿" }
+        if lower.contains("ハワイ") || lower.contains("hawaii") { return "🇺🇸" }
+        
+        return "🌐"
     }
     
     static func weatherIcon(for code: Int, hour: Int? = nil) -> String {
@@ -144,11 +197,13 @@ class WeatherManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             let currentTz = TimeZone(identifier: tz) ?? TimeZone.current
             let gmtOffsetHours = currentTz.secondsFromGMT() / 3600
             let gmtString = gmtOffsetHours >= 0 ? "GMT+\(gmtOffsetHours)" : "GMT\(gmtOffsetHours)"
+            let flag = WeatherManager.flagEmoji(for: settings.manualCountryName, code: settings.manualCountryCode)
             
-            let label = "\(settings.manualCityName) (\(gmtString))"
+            let label = "\(flag) \(settings.manualCityName) (\(gmtString))"
             
             DispatchQueue.main.async {
                 self.locationName = settings.manualCityName
+                self.countryFlag = flag
                 self.timezoneInfo = gmtString
                 self.fullLocationLabel = label
             }
@@ -188,7 +243,13 @@ class WeatherManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         
         geocoder.reverseGeocodeLocation(location, preferredLocale: Locale(identifier: "ja_JP")) { [weak self] placemarks, _ in
             var name = ""
+            var country = ""
+            var countryCode = ""
+            
             if let place = placemarks?.first {
+                country = place.country ?? ""
+                countryCode = place.isoCountryCode ?? ""
+                
                 if let locality = place.locality {
                     name = locality
                     if let admin = place.administrativeArea, admin != locality {
@@ -203,9 +264,12 @@ class WeatherManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                 name = "現在地"
             }
             
-            let label = "\(name) (\(gmtString))"
+            let flag = WeatherManager.flagEmoji(for: country, code: countryCode)
+            let label = "\(flag) \(name) (\(gmtString))"
+            
             DispatchQueue.main.async {
                 self?.locationName = name
+                self?.countryFlag = flag
                 self?.timezoneInfo = gmtString
                 self?.fullLocationLabel = label
             }
@@ -237,6 +301,7 @@ class WeatherManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             var tz = TimeZone.current.identifier
             var cityStr = ""
             var countryStr = ""
+            var countryCodeStr = ""
             
             if let data = data,
                let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
@@ -254,6 +319,9 @@ class WeatherManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                 if let countryName = json["country"] as? String {
                     countryStr = countryName
                 }
+                if let code = json["countryCode"] as? String {
+                    countryCodeStr = code
+                }
             }
             
             let currentTz = TimeZone(identifier: tz) ?? TimeZone.current
@@ -269,10 +337,12 @@ class WeatherManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                 locDisplay = currentTz.identifier.replacingOccurrences(of: "_", with: " ")
             }
             
-            let label = "\(locDisplay) (\(gmtString))"
+            let flag = WeatherManager.flagEmoji(for: countryStr, code: countryCodeStr)
+            let label = "\(flag) \(locDisplay) (\(gmtString))"
             
             DispatchQueue.main.async {
                 self?.locationName = locDisplay
+                self?.countryFlag = flag
                 self?.timezoneInfo = gmtString
                 self?.fullLocationLabel = label
             }
@@ -416,11 +486,14 @@ class WeatherManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                       let tz = item["timezone"] as? String else { continue }
                 
                 let admin1 = item["admin1"] as? String
+                let countryCode = item["country_code"] as? String
+                
                 list.append(GeocodingCityResult(
                     id: id,
                     name: name,
                     admin1: admin1,
                     country: country,
+                    countryCode: countryCode,
                     latitude: lat,
                     longitude: lon,
                     timezone: tz
@@ -438,6 +511,7 @@ class WeatherManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         settings.locationMode = "manual"
         settings.manualCityName = city.displayName
         settings.manualCountryName = city.country
+        settings.manualCountryCode = city.countryCode ?? ""
         settings.manualLatitude = city.latitude
         settings.manualLongitude = city.longitude
         settings.manualTimezone = city.timezone

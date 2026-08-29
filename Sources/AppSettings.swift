@@ -53,6 +53,7 @@ class AppSettings: ObservableObject {
     @AppStorage("locationMode") var locationMode: String = "auto" // "auto" or "manual"
     @AppStorage("manualCityName") var manualCityName: String = ""
     @AppStorage("manualCountryName") var manualCountryName: String = ""
+    @AppStorage("manualCountryCode") var manualCountryCode: String = ""
     @AppStorage("manualLatitude") var manualLatitude: Double = 0.0
     @AppStorage("manualLongitude") var manualLongitude: Double = 0.0
     @AppStorage("manualTimezone") var manualTimezone: String = ""

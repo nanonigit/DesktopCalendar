@@ -101,9 +101,8 @@ struct SettingsView: View {
                                                     citySearchQuery = ""
                                                 }) {
                                                     HStack {
-                                                        Image(systemName: "mappin.and.ellipse")
-                                                            .font(.system(size: 11))
-                                                            .foregroundColor(.accentColor)
+                                                        Text(city.flag)
+                                                            .font(.system(size: 14))
                                                         Text(city.displayName)
                                                             .font(.system(size: 12))
                                                         Spacer()

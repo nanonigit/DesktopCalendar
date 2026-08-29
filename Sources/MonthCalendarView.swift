@@ -32,14 +32,19 @@ struct MonthCalendarView: View {
                     Spacer()
                 }
                 
-                // Recognized Location & Timezone Indicator
+                // Recognized Location & Timezone Indicator with Country Flag
                 if !weatherManager.fullLocationLabel.isEmpty {
                     HStack(spacing: 3) {
-                        Image(systemName: "location.fill")
-                            .font(.system(size: 7.5))
-                            .foregroundColor(.accentColor)
+                        if !weatherManager.countryFlag.isEmpty {
+                            Text(weatherManager.countryFlag)
+                                .font(.system(size: 11))
+                        } else {
+                            Image(systemName: "location.fill")
+                                .font(.system(size: 7.5))
+                                .foregroundColor(.accentColor)
+                        }
                         
-                        Text(weatherManager.fullLocationLabel)
+                        Text(weatherManager.locationName.isEmpty ? "現在地" : "\(weatherManager.locationName) (\(weatherManager.timezoneInfo))")
                             .font(.system(size: 9.5, weight: .medium))
                             .foregroundColor(.secondary.opacity(0.85))
                             .lineLimit(1)
