@@ -33,6 +33,7 @@ struct DayWeather: Identifiable {
     let weatherCode: Int
     let maxTemp: Int
     let minTemp: Int
+    let precipProbMax: Int
     
     var iconName: String {
         WeatherManager.weatherIcon(for: weatherCode)
@@ -40,6 +41,10 @@ struct DayWeather: Identifiable {
     
     var iconColor: Color {
         WeatherManager.weatherColor(for: weatherCode)
+    }
+    
+    var isRainyOrSnow: Bool {
+        return (51...67).contains(weatherCode) || (80...82).contains(weatherCode) || (71...77).contains(weatherCode) || (85...86).contains(weatherCode) || (95...99).contains(weatherCode)
     }
 }
 
@@ -49,6 +54,7 @@ struct HourlyWeather: Identifiable {
     let hour: Int          // 0...23
     let weatherCode: Int
     let temp: Int
+    let precipProb: Int
     
     var iconName: String {
         WeatherManager.weatherIcon(for: weatherCode, hour: hour)
@@ -56,6 +62,10 @@ struct HourlyWeather: Identifiable {
     
     var iconColor: Color {
         WeatherManager.weatherColor(for: weatherCode)
+    }
+    
+    var isRainyOrSnow: Bool {
+        return (51...67).contains(weatherCode) || (80...82).contains(weatherCode) || (71...77).contains(weatherCode) || (85...86).contains(weatherCode) || (95...99).contains(weatherCode)
     }
 }
 
@@ -353,7 +363,7 @@ class WeatherManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     
     private func fetchForecast(lat: Double, lon: Double, timezone: String) {
         let tzEncoded = timezone.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "Asia/Tokyo"
-        let urlStr = "https://api.open-meteo.com/v1/forecast?latitude=\(lat)&longitude=\(lon)&daily=weathercode,temperature_2m_max,temperature_2m_min&hourly=weathercode,temperature_2m&timezone=\(tzEncoded)"
+        let urlStr = "https://api.open-meteo.com/v1/forecast?latitude=\(lat)&longitude=\(lon)&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_probability_max&hourly=weathercode,temperature_2m,precipitation_probability&timezone=\(tzEncoded)"
         
         guard let url = URL(string: urlStr) else {
             DispatchQueue.main.async { self.isRefreshing = false }
@@ -380,13 +390,18 @@ class WeatherManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                let maxTemps = daily["temperature_2m_max"] as? [Double],
                let minTemps = daily["temperature_2m_min"] as? [Double] {
                 
+                let precipMaxList = daily["precipitation_probability_max"] as? [Int] ?? []
+                
                 for i in 0..<times.count {
                     guard i < codes.count, i < maxTemps.count, i < minTemps.count else { break }
+                    let pMax = i < precipMaxList.count ? precipMaxList[i] : 0
+                    
                     let item = DayWeather(
                         dateString: times[i],
                         weatherCode: codes[i],
                         maxTemp: Int(round(maxTemps[i])),
-                        minTemp: Int(round(minTemps[i]))
+                        minTemp: Int(round(minTemps[i])),
+                        precipProbMax: pMax
                     )
                     dailyDict[times[i]] = item
                 }
@@ -398,6 +413,8 @@ class WeatherManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                let hCodes = hourly["weathercode"] as? [Int],
                let hTemps = hourly["temperature_2m"] as? [Double] {
                 
+                let hPrecipList = hourly["precipitation_probability"] as? [Int] ?? []
+                
                 var hDict: [String: [Int: HourlyWeather]] = [:]
                 for i in 0..<hTimes.count {
                     guard i < hCodes.count, i < hTemps.count else { break }
@@ -406,12 +423,14 @@ class WeatherManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                     guard parts.count == 2 else { continue }
                     let datePart = String(parts[0])
                     let hourPart = parts[1].split(separator: ":").first.flatMap { Int($0) } ?? 0
+                    let precip = i < hPrecipList.count ? hPrecipList[i] : 0
                     
                     let item = HourlyWeather(
                         dateString: datePart,
                         hour: hourPart,
                         weatherCode: hCodes[i],
-                        temp: Int(round(hTemps[i]))
+                        temp: Int(round(hTemps[i])),
+                        precipProb: precip
                     )
                     
                     if hDict[datePart] == nil {
@@ -423,16 +442,20 @@ class WeatherManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                 // Guarantee 100% consistency: Header Max/Min must strictly equal the actual 24-hour extremes
                 for (dateStr, hourMap) in hDict {
                     let temps = hourMap.values.map { $0.temp }
+                    let precips = hourMap.values.map { $0.precipProb }
+                    
                     if !temps.isEmpty {
                         let actualMax = temps.max() ?? 0
                         let actualMin = temps.min() ?? 0
+                        let maxPrecip = precips.max() ?? (dailyDict[dateStr]?.precipProbMax ?? 0)
                         let existingCode = dailyDict[dateStr]?.weatherCode ?? hourMap[12]?.weatherCode ?? 0
                         
                         dailyDict[dateStr] = DayWeather(
                             dateString: dateStr,
                             weatherCode: existingCode,
                             maxTemp: actualMax,
-                            minTemp: actualMin
+                            minTemp: actualMin,
+                            precipProbMax: maxPrecip
                         )
                     }
                 }

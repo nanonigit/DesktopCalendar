@@ -453,7 +453,7 @@ struct AppleCalendarDayHeader: View {
                     }
                 }
                 
-                // Day Weather Forecast Badge (Icon + High/Low Temps: e.g. ⛅️ 28°/19°)
+                // Day Weather Forecast Badge (Icon + High/Low Temps: e.g. ⛅️ 28°/19° + Rain chance if >= 20%)
                 if let w = weather {
                     HStack(spacing: 2) {
                         Image(systemName: w.iconName)
@@ -472,6 +472,13 @@ struct AppleCalendarDayHeader: View {
                             Text("\(w.minTemp)°")
                                 .font(.system(size: 8.5, weight: .medium, design: .rounded))
                                 .foregroundColor(.white.opacity(0.6))
+                            
+                            if w.precipProbMax >= 20 || w.isRainyOrSnow {
+                                Text("\(w.precipProbMax)%")
+                                    .font(.system(size: 8.5, weight: .bold, design: .rounded))
+                                    .foregroundColor(Color(red: 0.35, green: 0.8, blue: 1.0))
+                                    .padding(.leading, 1)
+                            }
                         }
                     }
                 }
@@ -527,6 +534,12 @@ struct DayTimelineColumn: View {
                                     Text("\(hw.temp)°")
                                         .font(.system(size: hourHeight < 24 ? 7.5 : 8.5, weight: .semibold, design: .rounded))
                                         .foregroundColor(.white.opacity(0.55))
+                                    
+                                    if hw.precipProb >= 20 || hw.isRainyOrSnow {
+                                        Text("\(hw.precipProb)%")
+                                            .font(.system(size: hourHeight < 24 ? 7.0 : 7.5, weight: .bold, design: .rounded))
+                                            .foregroundColor(Color(red: 0.35, green: 0.8, blue: 1.0))
+                                    }
                                 }
                                 .padding(.horizontal, 3.5)
                                 .padding(.vertical, 1)
