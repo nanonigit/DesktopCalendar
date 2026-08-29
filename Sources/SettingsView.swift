@@ -209,6 +209,26 @@ struct SettingsView: View {
                         .pickerStyle(.segmented)
                         .padding(.vertical, 2)
                         
+                        // Timeline Display Mode (Fit vs Scroll)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("タイムライン表示形式（時間範囲）")
+                                .font(.subheadline.bold())
+                                .foregroundColor(.secondary)
+                            
+                            Picker("タイムライン表示形式", selection: $settings.timelineDisplayMode) {
+                                ForEach(TimelineDisplayMode.allCases) { mode in
+                                    Text(mode.label).tag(mode)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                            
+                            Text(settings.timelineDisplayMode == .fitDaytime ? "※ 活動時間（7:00〜23:00）をウィンドウ高さに合わせてスクロールなしで収めます。" : (settings.timelineDisplayMode == .fit24 ? "※ 0:00〜23:00の24時間全体をスクロールなしで1画面に収めます。" : "※ 1時間40pxのゆったり表示で、現在の時間帯に自動追従します。"))
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary.opacity(0.85))
+                                .padding(.top, 1)
+                        }
+                        .padding(.vertical, 2)
+                        
                         HStack {
                             Text("左パネル（カレンダー・ToDo）の幅")
                             Spacer()

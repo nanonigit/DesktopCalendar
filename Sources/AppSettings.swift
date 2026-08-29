@@ -2,6 +2,22 @@ import SwiftUI
 import Combine
 import ServiceManagement
 
+enum TimelineDisplayMode: String, CaseIterable, Identifiable {
+    case fitDaytime = "fitDaytime"
+    case fit24 = "fit24"
+    case scroll = "scroll"
+    
+    var id: String { rawValue }
+    
+    var label: String {
+        switch self {
+        case .fitDaytime: return "活動時間 (7〜23時)"
+        case .fit24: return "24時間全体"
+        case .scroll: return "ゆったりスクロール"
+        }
+    }
+}
+
 enum ReminderDateRange: String, CaseIterable, Identifiable {
     case today = "today"
     case todayTomorrow = "2days"
@@ -48,6 +64,15 @@ class AppSettings: ObservableObject {
     @AppStorage("reminderDateRange") var reminderDateRangeRaw: String = ReminderDateRange.all.rawValue
     
     @AppStorage("timelineDaysCount") var timelineDaysCount: Int = 1 // 1, 2, or 3 days
+    @AppStorage("timelineDisplayMode") var timelineDisplayModeRaw: String = TimelineDisplayMode.fitDaytime.rawValue
+    
+    var timelineDisplayMode: TimelineDisplayMode {
+        get { TimelineDisplayMode(rawValue: timelineDisplayModeRaw) ?? .fitDaytime }
+        set {
+            timelineDisplayModeRaw = newValue.rawValue
+            objectWillChange.send()
+        }
+    }
     
     // Location Settings
     @AppStorage("locationMode") var locationMode: String = "auto" // "auto" or "manual"
